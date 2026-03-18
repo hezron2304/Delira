@@ -1,0 +1,9 @@
+Analyzing delira...
+
+   info - lib\home_page.dart:205:31 - Unnecessary use of multiple underscores. Try using '_'. - unnecessary_underscores
+   info - lib\home_page.dart:261:31 - Unnecessary use of multiple underscores. Try using '_'. - unnecessary_underscores
+   info - lib\home_page.dart:333:31 - Unnecessary use of multiple underscores. Try using '_'. - unnecessary_underscores
+   info - test.dart:6:5 - Don't invoke 'print' in production code. Try using a logging framework. - avoid_print
+   info - test.dart:8:5 - Don't invoke 'print' in production code. Try using a logging framework. - avoid_print
+
+5 issues found.

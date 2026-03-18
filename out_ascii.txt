@@ -1,0 +1,10 @@
+Analyzing delira...
+
+  error - lib\login_page.dart:62:28 - The class 'GoogleSignIn' doesn't have an unnamed constructor. Try using one of the named constructors defined in 'GoogleSignIn'. - new_with_undefined_constructor_default
+  error - lib\login_page.dart:63:45 - The method 'signIn' isn't defined for the type 'GoogleSignIn'. Try correcting the name to the name of an existing method, or defining a method named 'signIn'. - undefined_method
+warning - lib\login_page.dart:3:62 - The library 'package:supabase_flutter/supabase_flutter.dart' doesn't export a member with the hidden name 'GoogleSignIn'. Try removing the name from the list of hidden members. - undefined_hidden_name
+   info - lib\home_page.dart:205:31 - Unnecessary use of multiple underscores. Try using '_'. - unnecessary_underscores
+   info - lib\home_page.dart:261:31 - Unnecessary use of multiple underscores. Try using '_'. - unnecessary_underscores
+   info - lib\home_page.dart:333:31 - Unnecessary use of multiple underscores. Try using '_'. - unnecessary_underscores
+
+6 issues found.
