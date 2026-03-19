@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:delira/detail_page.dart';
 import 'package:delira/profil_page.dart';
+import 'package:delira/hotel_page.dart';
+import 'package:delira/map_page.dart';
+import 'package:delira/notifikasi_page.dart';
+import 'package:delira/ai_guide_page.dart';
+import 'package:delira/theme/app_colors.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -55,29 +61,86 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _fetchDestinasi() async {
-    try {
-      final res = await Supabase.instance.client
-          .from('destinasi')
-          .select()
-          .eq('is_active', true);
-      
-      if (mounted) {
-        setState(() {
-          _destinasiList = List<Map<String, dynamic>>.from(res);
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error fetching destinasi: $e');
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+    // Dummy Data for UI presentation
+    if (mounted) {
+      setState(() {
+        _destinasiList = [
+          {
+            'kategori': 'Situs Sejarah',
+            'badge': 'Religi',
+            'filter': 'Religi',
+            'nama': 'Masjid Raya Al-Mashun',
+            'rating': 4.8,
+            'jarak_km': 2.3,
+            'is_featured': true,
+            'image_url': 'https://images.unsplash.com/photo-1565552643983-6df3d12ebd83?auto=format&fit=crop&q=80',
+            'icon': Icons.mosque,
+          },
+          {
+            'kategori': 'Sejarah',
+            'badge': 'Sejarah',
+            'filter': 'Sejarah',
+            'nama': 'Istana Maimun',
+            'rating': 4.7,
+            'jarak_km': 1.8,
+            'is_featured': true,
+            'image_url': 'https://images.unsplash.com/photo-1582539097950-7164998273f3?auto=format&fit=crop&q=80',
+            'icon': Icons.account_balance,
+          },
+          {
+            'kategori': 'Religi',
+            'badge': 'Religi',
+            'filter': 'Religi',
+            'nama': 'Gereja Immanuel',
+            'rating': 4.6,
+            'jarak_km': 3.1,
+            'is_featured': false,
+            'image_url': '',
+            'icon': Icons.church,
+          },
+          {
+            'kategori': 'Kuliner',
+            'badge': 'Kuliner',
+            'filter': 'Kuliner',
+            'nama': 'Soto Kesawan',
+            'rating': 4.9,
+            'jarak_km': 0.8,
+            'is_featured': true,
+            'image_url': 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&q=80',
+            'icon': Icons.ramen_dining,
+          },
+          {
+            'kategori': 'Situs Sejarah',
+            'badge': 'Cagar Budaya',
+            'filter': 'Sejarah',
+            'nama': 'Mansion Tjong A Fie',
+            'rating': 4.8,
+            'jarak_km': 1.1,
+            'is_featured': true,
+            'image_url': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Tjong_A_Fie_Mansion_%286071477708%29.jpg/1200px-Tjong_A_Fie_Mansion_%286071477708%29.jpg',
+            'icon': Icons.storefront,
+          },
+          {
+            'kategori': 'Taman Rekreasi',
+            'badge': 'Taman',
+            'filter': 'Rekreasi',
+            'nama': 'Taman Hutan Cemara',
+            'rating': 4.5,
+            'jarak_km': 6.3,
+            'is_featured': true,
+            'image_url': 'https://images.unsplash.com/photo-1444459092404-b6e15d2a9311?auto=format&fit=crop&q=80',
+            'icon': Icons.park,
+          },
+        ];
+        _isLoading = false;
+      });
     }
   }
 
+
   List<Map<String, dynamic>> get _filteredDestinasi {
     if (_activeCategory == 'Semua') return _destinasiList;
-    return _destinasiList.where((d) => d['kategori'] == _activeCategory).toList();
+    return _destinasiList.where((d) => d['filter'] == _activeCategory).toList();
   }
 
   List<Map<String, dynamic>> get _destinasiUnggulan {
@@ -86,21 +149,29 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryGreen = Color(0xFF2D7A4F);
-    
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: AppColors.surface,
       body: SafeArea(
         bottom: false,
         child: _currentIndex == 3
             ? const ProfilPage()
-            : SingleChildScrollView(
+            : _currentIndex == 2
+                ? const HotelPage()
+                : _currentIndex == 4
+                    ? const AIGuidePage()
+                    : _currentIndex == 1
+                    ? MapPage(onHotelRequested: () {
+                        setState(() {
+                          _currentIndex = 2; // Switch to Hotel tab
+                        });
+                      })
+                    : SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _buildHeader(primaryGreen),
+                    _buildHeader(),
                     const SizedBox(height: 24),
-                    _buildCategoryChips(primaryGreen),
+                    _buildCategoryChips(),
                     const SizedBox(height: 24),
                     _buildSectionTitle('Destinasi Unggulan'),
                     const SizedBox(height: 16),
@@ -114,24 +185,38 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
       ),
-      bottomNavigationBar: _buildBottomNav(primaryGreen),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: primaryGreen,
-        shape: const CircleBorder(),
-        elevation: 4,
-        child: const Icon(Icons.explore, color: Colors.white, size: 28),
+      bottomNavigationBar: _buildBottomNav(),
+      floatingActionButton: Transform.translate(
+        offset: const Offset(0, 14), // Mendorong FAB agak ke bawah
+        child: SizedBox(
+          width: 66,
+          height: 66,
+          child: FittedBox(
+            child: FloatingActionButton(
+              onPressed: () {
+                setState(() {
+                  _currentIndex = 4;
+                });
+              },
+              backgroundColor: _currentIndex == 4 ? AppColors.primaryDark : AppColors.primary, 
+              shape: const CircleBorder(),
+              elevation: 4,
+              heroTag: 'aiGuideMainBtn',
+              child: const Icon(Icons.smart_toy_outlined, color: Colors.white, size: 32),
+            ),
+          ),
+        ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 
-  Widget _buildHeader(Color primaryGreen) {
+  Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.all(24.0),
-      decoration: BoxDecoration(
-        color: primaryGreen,
-        borderRadius: const BorderRadius.only(
+      decoration: const BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.only(
           bottomLeft: Radius.circular(24),
           bottomRight: Radius.circular(24),
         ),
@@ -159,17 +244,35 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
               Stack(
+                clipBehavior: Clip.none,
                 children: [
-                  const Icon(Icons.notifications_outlined, color: Colors.white, size: 28),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const NotifikasiPage()),
+                      );
+                    },
+                    child: const Icon(Icons.notifications_outlined, color: Colors.white, size: 28),
+                  ),
                   Positioned(
-                    right: 2,
-                    top: 2,
+                    right: -2,
+                    top: -2,
                     child: Container(
-                      width: 10,
-                      height: 10,
+                      padding: const EdgeInsets.all(4),
                       decoration: const BoxDecoration(
                         color: Colors.red,
                         shape: BoxShape.circle,
+                      ),
+                      child: const Text(
+                        '3',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          height: 1,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
                   ),
@@ -198,14 +301,14 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildCategoryChips(Color primaryGreen) {
+  Widget _buildCategoryChips() {
     return SizedBox(
       height: 40,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         scrollDirection: Axis.horizontal,
         itemCount: _categories.length,
-        separatorBuilder: (_, _x) => const SizedBox(width: 12),
+        separatorBuilder: (context, index) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           final category = _categories[index];
           final isActive = category == _activeCategory;
@@ -218,17 +321,17 @@ class _HomePageState extends State<HomePage> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               decoration: BoxDecoration(
-                color: isActive ? primaryGreen : Colors.white,
+                color: isActive ? AppColors.primary : Colors.white,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: isActive ? Colors.transparent : primaryGreen,
+                  color: isActive ? Colors.transparent : AppColors.border,
                 ),
               ),
               alignment: Alignment.center,
               child: Text(
                 category,
                 style: TextStyle(
-                  color: isActive ? Colors.white : primaryGreen,
+                  color: isActive ? Colors.white : AppColors.textPrimary,
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
                 ),
@@ -248,7 +351,7 @@ class _HomePageState extends State<HomePage> {
         style: const TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.bold,
-          color: Colors.black87,
+          color: AppColors.textPrimary,
         ),
       ),
     );
@@ -261,7 +364,7 @@ class _HomePageState extends State<HomePage> {
         padding: const EdgeInsets.symmetric(horizontal: 24),
         scrollDirection: Axis.horizontal,
         itemCount: 3,
-        separatorBuilder: (_, _x) => const SizedBox(width: 16),
+        separatorBuilder: (context, index) => const SizedBox(width: 16),
         itemBuilder: (context, index) {
           return Container(
             width: 160,
@@ -328,69 +431,117 @@ class _HomePageState extends State<HomePage> {
     }
 
     return SizedBox(
-      height: 220,
+      height: 180,
       child: ListView.separated(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         scrollDirection: Axis.horizontal,
         itemCount: items.length,
-        separatorBuilder: (_, _x) => const SizedBox(width: 16),
+        separatorBuilder: (context, index) => const SizedBox(width: 16),
         itemBuilder: (context, index) {
           final item = items[index];
           final String name = item['nama'] ?? 'Nav';
-          final String badge = item['kategori'] ?? 'Wisata';
+          final String badge = item['badge'] ?? 'Wisata';
           final num rating = item['rating'] ?? 0.0;
           final String dist = '${item['jarak_km'] ?? '0.0'} km';
           final String imageUrl = item['image_url'] ?? '';
 
-          return Container(
-            width: 160,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade400,
-              borderRadius: BorderRadius.circular(16),
-              image: imageUrl.isNotEmpty 
-                  ? DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover) 
-                  : null,
-            ),
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          return SizedBox(
+            width: 280,
+            child: Stack(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.green.shade800.withAlpha(200),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    badge,
-                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    image: imageUrl.isNotEmpty 
+                        ? DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover) 
+                        : null,
                   ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withAlpha(180),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '⭐ $rating • $dist',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryDark.withAlpha(200),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          badge,
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
                       ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const Icon(Icons.star, color: Colors.amber, size: 14),
+                              const SizedBox(width: 4),
+                              Text(
+                                rating.toString(),
+                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(width: 6),
+                              const Text('•', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                              const SizedBox(width: 6),
+                              Text(
+                                dist,
+                                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                Positioned.fill(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => DetailPage(destinasi: item)),
+                        );
+                        if (result == 'GO_TO_HOTEL' && mounted) {
+                          setState(() {
+                            _currentIndex = 2; // Index for Hotel tab
+                          });
+                        }
+                      },
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -415,81 +566,103 @@ class _HomePageState extends State<HomePage> {
       child: Column(
         children: items.map((item) {
           final String name = item['nama'] ?? 'Nav';
-          final String badge = item['kategori'] ?? 'Wisata';
+          final String kategori = item['kategori'] ?? 'Wisata'; // Use literal category text naturally
           final num rating = item['rating'] ?? 0.0;
           final String dist = '${item['jarak_km'] ?? '0.0'} km';
-          final String imageUrl = item['image_url'] ?? '';
 
-          return Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Material(
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(10),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade400,
-                    borderRadius: BorderRadius.circular(12),
-                    image: imageUrl.isNotEmpty 
-                        ? DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover) 
-                        : null,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => DetailPage(destinasi: item)),
+                  );
+                  if (result == 'GO_TO_HOTEL' && mounted) {
+                    setState(() {
+                      _currentIndex = 2; // Index for Hotel tab
+                    });
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              badge,
-                              style: TextStyle(color: Colors.green.shade700, fontSize: 10, fontWeight: FontWeight.bold),
-                            ),
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            item['icon'] ?? Icons.place,
+                            color: AppColors.primaryDark,
+                            size: 36,
                           ),
-                          const Icon(Icons.bookmark_border, color: Colors.grey, size: 20),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        name,
-                        style: const TextStyle(
-                          color: Colors.black87,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '⭐ $rating • $dist',
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 12,
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    name,
+                                    style: const TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      height: 1.3,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Row(
+                                  children: [
+                                    Text(
+                                      dist,
+                                      style: const TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.bold),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.chevron_right, color: Colors.grey, size: 18),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              children: [
+                                Text(
+                                  kategori,
+                                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text('•', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                                const SizedBox(width: 8),
+                                const Icon(Icons.star, color: Colors.amber, size: 14),
+                                const SizedBox(width: 4),
+                                Text(rating.toString(), style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
+              ),
             ),
           );
         }).toList(),
@@ -497,25 +670,53 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildBottomNav(Color primaryGreen) {
+  Widget _buildBottomNav() {
     return BottomAppBar(
-      shape: const CircularNotchedRectangle(),
-      notchMargin: 8.0,
       color: Colors.white,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _buildNavItem(Icons.home, 'Beranda', 0, primaryGreen),
-          _buildNavItem(Icons.map_outlined, 'Peta', 1, primaryGreen),
-          const SizedBox(width: 48), // Space for FAB
-          _buildNavItem(Icons.hotel_outlined, 'Hotel', 2, primaryGreen),
-          _buildNavItem(Icons.person_outline, 'Profil', 3, primaryGreen),
-        ],
+      padding: EdgeInsets.zero,
+      elevation: 20,
+      child: SizedBox(
+        height: 70,
+        child: Row(
+          children: [
+            Expanded(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildNavItem(Icons.home, 'Beranda', 0),
+                  _buildNavItem(Icons.map_outlined, 'Peta', 1),
+                ],
+              ),
+            ),
+            SizedBox(
+              width: 80,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: const [
+                  Text(
+                    'AI Guide',
+                    style: TextStyle(color: AppColors.primaryDark, fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                  SizedBox(height: 6),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildNavItem(Icons.hotel_outlined, 'Hotel', 2),
+                  _buildNavItem(Icons.person_outline, 'Profil', 3),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildNavItem(IconData icon, String label, int index, Color primaryGreen) {
+  Widget _buildNavItem(IconData icon, String label, int index) {
     final isActive = _currentIndex == index;
     return InkWell(
       onTap: () {
@@ -527,12 +728,12 @@ class _HomePageState extends State<HomePage> {
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: isActive ? primaryGreen : Colors.grey, size: 24),
+          Icon(icon, color: isActive ? AppColors.primary : Colors.grey, size: 24),
           const SizedBox(height: 4),
           Text(
             label,
             style: TextStyle(
-              color: isActive ? primaryGreen : Colors.grey,
+              color: isActive ? AppColors.primary : Colors.grey,
               fontSize: 10,
               fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
             ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:delira/home_page.dart';
+import 'package:delira/theme/app_colors.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -86,9 +87,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryGreen = Color(0xFF2D7A4F);
-    const darkGreen = Color(0xFF1E6B4A);
-    const inputFillColor = Color(0xFFF0F0F0); // light gray
+    const inputFillColor = AppColors.surface;
     
     return Scaffold(
       backgroundColor: Colors.white,
@@ -116,7 +115,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
@@ -124,7 +123,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 'Bergabung dan mulai jelajahi Medan',
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.black54,
+                  color: AppColors.textSecondary,
                 ),
               ),
               const SizedBox(height: 32),
@@ -152,18 +151,26 @@ class _RegisterPageState extends State<RegisterPage> {
                 controller: _phoneController,
                 decoration: InputDecoration(
                   hintText: '8xx-xxxx-xxxx',
-                  hintStyle: const TextStyle(color: Colors.black38),
-                  prefixIcon: const Icon(Icons.phone_outlined, color: Colors.black54),
+                  hintStyle: const TextStyle(color: AppColors.textTertiary),
+                  prefixIcon: const Icon(Icons.phone_outlined, color: AppColors.textSecondary),
                   prefixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 48),
                   prefix: const Padding(
                     padding: EdgeInsets.only(right: 8.0, left: 8.0),
-                    child: Text('+62', style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+                    child: Text('+62', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
                   ),
                   filled: true,
                   fillColor: inputFillColor,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
                   ),
                   contentPadding: const EdgeInsets.symmetric(vertical: 16),
                 ),
@@ -210,7 +217,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     width: 24,
                     child: Checkbox(
                       value: _agreedToTerms,
-                      activeColor: primaryGreen,
+                      activeColor: AppColors.primary,
                       onChanged: (val) {
                         setState(() { _agreedToTerms = val ?? false; });
                       },
@@ -225,12 +232,12 @@ class _RegisterPageState extends State<RegisterPage> {
                         children: [
                           TextSpan(
                             text: 'Syarat & Ketentuan',
-                            style: TextStyle(color: darkGreen, fontWeight: FontWeight.bold),
+                            style: TextStyle(color: AppColors.primaryDark, fontWeight: FontWeight.bold),
                           ),
                           TextSpan(text: ' dan '),
                           TextSpan(
                             text: 'Kebijakan Privasi',
-                            style: TextStyle(color: darkGreen, fontWeight: FontWeight.bold),
+                            style: TextStyle(color: AppColors.primaryDark, fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
@@ -244,7 +251,7 @@ class _RegisterPageState extends State<RegisterPage> {
               ElevatedButton(
                 onPressed: (_agreedToTerms && !_isLoading) ? _signUp : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryGreen,
+                  backgroundColor: AppColors.primary,
                   disabledBackgroundColor: Colors.grey.shade300,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -254,7 +261,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   elevation: 0,
                 ),
                 child: _isLoading
-                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: primaryGreen, strokeWidth: 2))
+                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: AppColors.primary, strokeWidth: 2))
                     : const Text(
                         'Daftar',
                         style: TextStyle(
@@ -280,7 +287,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     child: const Text(
                       'Masuk',
                       style: TextStyle(
-                        color: darkGreen,
+                        color: AppColors.primaryDark,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -304,13 +311,21 @@ class _RegisterPageState extends State<RegisterPage> {
       controller: controller,
       decoration: InputDecoration(
         hintText: hintText,
-        hintStyle: const TextStyle(color: Colors.black38),
-        prefixIcon: Icon(prefixIcon, color: Colors.black54),
+        hintStyle: const TextStyle(color: AppColors.textTertiary),
+        prefixIcon: Icon(prefixIcon, color: AppColors.textSecondary),
         filled: true,
         fillColor: fillColor,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(vertical: 16),
       ),
@@ -330,20 +345,28 @@ class _RegisterPageState extends State<RegisterPage> {
       obscureText: obscure,
       decoration: InputDecoration(
         hintText: hintText,
-        hintStyle: const TextStyle(color: Colors.black38),
-        prefixIcon: Icon(prefixIcon, color: Colors.black54),
+        hintStyle: const TextStyle(color: AppColors.textTertiary),
+        prefixIcon: Icon(prefixIcon, color: AppColors.textSecondary),
         suffixIcon: IconButton(
           icon: Icon(
             obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-            color: Colors.black54,
+            color: AppColors.textSecondary,
           ),
           onPressed: onToggleVisibility,
         ),
         filled: true,
         fillColor: fillColor,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(vertical: 16),
       ),
