@@ -176,7 +176,7 @@ class _HotelPageState extends State<HotelPage> {
                 crossAxisCount: 2,
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
-                childAspectRatio: 0.56,
+                childAspectRatio: 0.48, // Reduced to make cards taller and fix overflow
               ),
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -360,7 +360,7 @@ class _HotelCardState extends State<_HotelCard> {
                         ),
                         alignment: Alignment.center,
                         child: Text(
-                          'Lihat Detail \u2192',
+                          'Lihat Detail',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
