@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:delira/login_page.dart';
 import 'package:delira/home_page.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:delira/theme/app_colors.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,8 +28,9 @@ class MyApp extends StatelessWidget {
       title: 'Delira',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1E6B4A)),
+        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
         useMaterial3: true,
+        textTheme: GoogleFonts.interTextTheme(Theme.of(context).textTheme),
       ),
       home: session != null ? const HomePage() : const LoginPage(),
     );

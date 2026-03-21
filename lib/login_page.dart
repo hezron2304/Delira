@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart' as google;
 import 'package:delira/register_page.dart';
 import 'package:delira/home_page.dart';
+import 'package:delira/theme/app_colors.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -112,9 +113,7 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryGreen = Color(0xFF2D7A4F);
-    const darkGreen = Color(0xFF1E6B4A);
-    const inputFillColor = Color(0xFFF0F0F0); // light gray
+    const inputFillColor = AppColors.surface;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -128,12 +127,12 @@ class _LoginPageState extends State<LoginPage> {
               const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.explore, color: darkGreen, size: 32),
+                  Icon(Icons.explore, color: AppColors.primary, size: 32),
                   SizedBox(width: 8),
                   Text(
                     'Delira',
                     style: TextStyle(
-                      color: darkGreen,
+                      color: AppColors.textPrimary,
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                       letterSpacing: 1.2,
@@ -149,13 +148,13 @@ class _LoginPageState extends State<LoginPage> {
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+                  color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 8),
               const Text(
                 'Masuk untuk melanjutkan perjalananmu',
-                style: TextStyle(fontSize: 14, color: Colors.black54),
+                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
               ),
               const SizedBox(height: 32),
 
@@ -165,16 +164,24 @@ class _LoginPageState extends State<LoginPage> {
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
                   hintText: 'Email atau nomor HP',
-                  hintStyle: const TextStyle(color: Colors.black38),
+                  hintStyle: const TextStyle(color: AppColors.textTertiary),
                   prefixIcon: const Icon(
                     Icons.email_outlined,
-                    color: Colors.black54,
+                    color: AppColors.textSecondary,
                   ),
                   filled: true,
                   fillColor: inputFillColor,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
                   ),
                   contentPadding: const EdgeInsets.symmetric(vertical: 16),
                 ),
@@ -187,10 +194,10 @@ class _LoginPageState extends State<LoginPage> {
                 obscureText: _obscurePassword,
                 decoration: InputDecoration(
                   hintText: 'Kata sandi',
-                  hintStyle: const TextStyle(color: Colors.black38),
+                  hintStyle: const TextStyle(color: AppColors.textTertiary),
                   prefixIcon: const Icon(
                     Icons.lock_outline,
-                    color: Colors.black54,
+                    color: AppColors.textSecondary,
                   ),
                   suffixIcon: IconButton(
                     icon: Icon(
@@ -208,8 +215,16 @@ class _LoginPageState extends State<LoginPage> {
                   filled: true,
                   fillColor: inputFillColor,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
                   ),
                   contentPadding: const EdgeInsets.symmetric(vertical: 16),
                 ),
@@ -226,7 +241,7 @@ class _LoginPageState extends State<LoginPage> {
                   child: const Text(
                     'Lupa kata sandi?',
                     style: TextStyle(
-                      color: darkGreen,
+                      color: AppColors.primaryDark,
                       fontWeight: FontWeight.w600,
                       fontSize: 14,
                     ),
@@ -239,8 +254,8 @@ class _LoginPageState extends State<LoginPage> {
               ElevatedButton(
                 onPressed: _isLoading ? null : _signIn,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryGreen,
-                  disabledBackgroundColor: primaryGreen.withAlpha(200),
+                  backgroundColor: AppColors.primary,
+                  disabledBackgroundColor: AppColors.primary.withAlpha(200),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
@@ -319,7 +334,7 @@ class _LoginPageState extends State<LoginPage> {
                 children: [
                   const Text(
                     'Belum punya akun? ',
-                    style: TextStyle(color: Colors.black54),
+                    style: TextStyle(color: AppColors.textSecondary),
                   ),
                   GestureDetector(
                     onTap: () {
@@ -331,7 +346,7 @@ class _LoginPageState extends State<LoginPage> {
                     child: const Text(
                       'Daftar sekarang',
                       style: TextStyle(
-                        color: darkGreen,
+                        color: AppColors.primaryDark,
                         fontWeight: FontWeight.bold,
                       ),
                     ),

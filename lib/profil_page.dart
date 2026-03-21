@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:delira/notifikasi_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:delira/login_page.dart';
+import 'package:delira/theme/app_colors.dart';
 
 class ProfilPage extends StatefulWidget {
   const ProfilPage({super.key});
@@ -11,9 +13,6 @@ class ProfilPage extends StatefulWidget {
 
 class _ProfilPageState extends State<ProfilPage> {
   bool _isSigningOut = false;
-
-  static const primaryGreen = Color(0xFF1A6B4A);
-  static const darkGreen = Color(0xFF145238);
 
   String get _userName {
     final meta = Supabase.instance.client.auth.currentUser?.userMetadata;
@@ -65,123 +64,161 @@ class _ProfilPageState extends State<ProfilPage> {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildTopCard(),
-          const SizedBox(height: 16),
-          _buildStatsCard(),
-          const SizedBox(height: 16),
+          // Header green + overlapping stats
+          _buildHeaderWithStats(),
+          const SizedBox(height: 60), // Space for overlapping badge + room before Aktivitas
+
+          // Aktivitas
           _buildSectionLabel('Aktivitas'),
-          _buildMenuCard([
-            _buildTile(Icons.location_on_outlined, 'Riwayat Kunjungan'),
-            _buildTile(Icons.favorite_border, 'Tempat Tersimpan'),
-            _buildTile(Icons.receipt_long_outlined, 'Riwayat Pemesanan'),
-            _buildTile(Icons.document_scanner_outlined, 'Riwayat Scan AI'),
-          ]),
+          const SizedBox(height: 8),
+          _buildMenuItem(Icons.location_on_outlined, 'Riwayat Kunjungan'),
+          _buildMenuItem(Icons.favorite_border, 'Tempat Tersimpan'),
+          _buildMenuItem(Icons.groups_outlined, 'Riwayat Pemesanan'),
+          _buildMenuItem(Icons.document_scanner_outlined, 'Riwayat Scan AI'),
+
           const SizedBox(height: 16),
+
+          // Pengaturan
           _buildSectionLabel('Pengaturan'),
-          _buildMenuCard([
-            _buildTile(Icons.language, 'Bahasa', trailing: 'Bahasa Indonesia'),
-            _buildTile(Icons.notifications_outlined, 'Notifikasi'),
-            _buildTile(Icons.lock_outlined, 'Ubah Kata Sandi'),
-            _buildTile(Icons.info_outlined, 'Tentang Delira'),
-          ]),
+          const SizedBox(height: 8),
+          _buildMenuItem(Icons.language, 'Bahasa', trailing: 'Bahasa Indonesia'),
+          _buildMenuItem(
+            Icons.notifications_outlined,
+            'Notifikasi',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const NotifikasiPage()),
+              );
+            },
+          ),
+          _buildMenuItem(Icons.lock_outlined, 'Ubah Kata Sandi'),
+          _buildMenuItem(Icons.info_outlined, 'Tentang Delira'),
+
           const SizedBox(height: 24),
           _buildSignOutButton(),
-          const SizedBox(height: 32),
+          const SizedBox(height: 100),
         ],
       ),
     );
   }
 
-  Widget _buildTopCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 48, 24, 32),
-      decoration: const BoxDecoration(
-        color: primaryGreen,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(28),
-          bottomRight: Radius.circular(28),
-        ),
-      ),
-      child: Column(
-        children: [
-          CircleAvatar(
-            radius: 40,
-            backgroundColor: darkGreen,
-            child: Text(
-              _initials,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
+  /// Green header with avatar LEFT, name/email RIGHT, Edit Profil button,
+  /// and stats badge overlapping the bottom edge.
+  Widget _buildHeaderWithStats() {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // Green container
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(24, 40, 24, 76), // extra bottom for overlap
+          decoration: const BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(28),
+              bottomRight: Radius.circular(28),
             ),
           ),
-          const SizedBox(height: 16),
-          Text(
-            _userName,
-            style: const TextStyle(
+          child: Column(
+            children: [
+              // Row: Avatar left, Name+Email right
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 34,
+                    backgroundColor: Colors.white.withAlpha(60),
+                    child: Text(
+                      _initials,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _userName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _userEmail,
+                          style: TextStyle(
+                            color: Colors.white.withAlpha(190),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              // Edit Profil button — full width
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: _showComingSoon,
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.white, width: 1.5),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text(
+                    'Edit Profil',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Stats badge — overlapping bottom of green header
+        Positioned(
+          bottom: -47,
+          left: 24,
+          right: 24,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            decoration: BoxDecoration(
               color: Colors.white,
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(12),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                _buildStat('12', 'Dikunjungi'),
+                _buildVerticalDivider(),
+                _buildStat('5', 'Disimpan'),
+                _buildVerticalDivider(),
+                _buildStat('8', 'Scan AI'),
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            _userEmail,
-            style: TextStyle(
-              color: Colors.white.withAlpha(200),
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 20),
-          OutlinedButton(
-            onPressed: _showComingSoon,
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Colors.white, width: 1.5),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 10),
-            ),
-            child: const Text(
-              'Edit Profil',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatsCard() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(10),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
         ),
-        child: Row(
-          children: [
-            _buildStat('12', 'Dikunjungi'),
-            _buildVerticalDivider(),
-            _buildStat('5', 'Disimpan'),
-            _buildVerticalDivider(),
-            _buildStat('8', 'Scan AI'),
-          ],
-        ),
-      ),
+      ],
     );
   }
 
@@ -194,13 +231,13 @@ class _ProfilPageState extends State<ProfilPage> {
             style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: primaryGreen,
+              color: AppColors.primary,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
-            style: const TextStyle(fontSize: 12, color: Colors.black54),
+            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
         ],
       ),
@@ -213,80 +250,67 @@ class _ProfilPageState extends State<ProfilPage> {
 
   Widget _buildSectionLabel(String label) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-            color: Colors.black87,
+      padding: const EdgeInsets.only(left: 24.0, right: 24.0, top: 16.0, bottom: 0),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 18,
+          color: AppColors.textPrimary,
+        ),
+      ),
+    );
+  }
+
+  /// Each menu item is its own rounded card with spacing
+  Widget _buildMenuItem(IconData icon, String label, {String? trailing, VoidCallback? onTap}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 2.0),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        elevation: 0,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap ?? _showComingSoon,
+          splashColor: AppColors.primaryLight,
+          highlightColor: AppColors.primaryLight.withAlpha(120),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.grey.shade100),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: AppColors.primary, size: 20),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+                  ),
+                ),
+                if (trailing != null) ...[
+                  Text(
+                    trailing,
+                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                const Icon(Icons.chevron_right, color: Colors.black38, size: 22),
+              ],
+            ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildMenuCard(List<Widget> tiles) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(10),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          children: tiles
-              .asMap()
-              .entries
-              .map((e) => Column(
-                    children: [
-                      e.value,
-                      if (e.key < tiles.length - 1)
-                        Divider(height: 1, indent: 56, color: Colors.grey.shade100),
-                    ],
-                  ))
-              .toList(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTile(IconData icon, String label, {String? trailing}) {
-    return ListTile(
-      onTap: _showComingSoon,
-      leading: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: primaryGreen.withAlpha(20),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: primaryGreen, size: 20),
-      ),
-      title: Text(
-        label,
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-      ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (trailing != null)
-            Text(
-              trailing,
-              style: const TextStyle(fontSize: 12, color: Colors.black45),
-            ),
-          const SizedBox(width: 4),
-          const Icon(Icons.chevron_right, color: Colors.black38, size: 20),
-        ],
       ),
     );
   }
@@ -297,8 +321,8 @@ class _ProfilPageState extends State<ProfilPage> {
       child: OutlinedButton.icon(
         onPressed: _isSigningOut ? null : _signOut,
         style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.red,
-          side: const BorderSide(color: Colors.red, width: 1.5),
+          foregroundColor: AppColors.danger,
+          side: const BorderSide(color: AppColors.danger, width: 1.5),
           minimumSize: const Size(double.infinity, 52),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -308,7 +332,7 @@ class _ProfilPageState extends State<ProfilPage> {
             ? const SizedBox(
                 width: 18,
                 height: 18,
-                child: CircularProgressIndicator(color: Colors.red, strokeWidth: 2),
+                child: CircularProgressIndicator(color: AppColors.danger, strokeWidth: 2),
               )
             : const Icon(Icons.logout),
         label: const Text(
