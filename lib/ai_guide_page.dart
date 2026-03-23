@@ -164,7 +164,7 @@ class _AIGuidePageState extends State<AIGuidePage> {
         throw Exception('API error: ${response.body}');
       }
     } catch (e) {
-      print('MedanBot Fallback Error: $e');
+      // MedanBot fallback triggered: $e
       // Step 3: Default fallback answer
       if (!mounted) return;
       const fallbackReply = '🤔 Maaf, saya belum punya informasi tentang itu. Coba tanyakan tentang destinasi wisata, kuliner, hotel, atau transportasi di Medan ya! 😊';
@@ -335,7 +335,7 @@ class _AIGuidePageState extends State<AIGuidePage> {
               // Scanning Markers (Center)
               Positioned.fill(
                 child: Center(
-                  child: Container(
+                  child: SizedBox(
                     width: 250,
                     height: 250,
                     child: Stack(
@@ -700,25 +700,4 @@ class _AIGuidePageState extends State<AIGuidePage> {
     );
   }
 
-  Widget _buildActionChip(String label) {
-    return GestureDetector(
-      onTap: () => _sendMessage(label),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.primary.withAlpha(50)),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.primaryDark,
-            fontWeight: FontWeight.bold,
-            fontSize: 12,
-          ),
-        ),
-      ),
-    );
-  }
 }
