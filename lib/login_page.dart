@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:google_sign_in/google_sign_in.dart' as google;
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:delira/register_page.dart';
 import 'package:delira/home_page.dart';
 import 'package:delira/theme/app_colors.dart';
@@ -69,22 +69,36 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _googleSignIn() async {
     setState(() => _isLoading = true);
     try {
-      final googleSignIn = google.GoogleSignIn(
+      await GoogleSignIn.instance.initialize(
         clientId:
             '319610939712-4t97beqneupotsbec6hek4afu9v8e38n.apps.googleusercontent.com',
-        scopes: ['email', 'profile'],
       );
-      final googleUser = await googleSignIn.signIn();
-      if (googleUser == null) {
+      
+      GoogleSignInAccount? googleUser;
+      try {
+        googleUser = await GoogleSignIn.instance.authenticate(
+          scopeHint: ['email', 'profile'],
+        );
+      } on GoogleSignInException catch (_) {
         if (mounted) setState(() => _isLoading = false);
         return;
       }
-      final googleAuth = await googleUser.authentication;
+
+      final googleAuth = googleUser.authentication;
+      if (googleAuth.idToken == null) {
+        throw const AuthException('Tidak ada ID Token dari Google');
+      }
+
+      String? accessToken;
+      try {
+        final authClient = await googleUser.authorizationClient.authorizationForScopes(['email', 'profile']);
+        accessToken = authClient?.accessToken;
+      } catch (_) {}
 
       final response = await Supabase.instance.client.auth.signInWithIdToken(
         provider: OAuthProvider.google,
         idToken: googleAuth.idToken!,
-        accessToken: googleAuth.accessToken,
+        accessToken: accessToken,
       );
 
       if (response.user != null && mounted) {

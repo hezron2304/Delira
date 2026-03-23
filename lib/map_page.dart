@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:delira/detail_page.dart';
-import 'package:delira/theme/app_colors.dart';
 
 class MapPage extends StatefulWidget {
   final VoidCallback? onHotelRequested;
@@ -10,473 +14,403 @@ class MapPage extends StatefulWidget {
   State<MapPage> createState() => _MapPageState();
 }
 
-class _MapPageState extends State<MapPage> with SingleTickerProviderStateMixin {
-  // Data dummy lokasi
-  final List<Map<String, dynamic>> _locations = [
-    {
-      'nama': 'Masjid Raya Al-Mashun',
-      'kategori': 'Situs Sejarah',
-      'rating': 4.8,
-      'jarak_km': 2.3,
-      'icon': Icons.mosque,
-      'topPercent': 0.30,
-      'leftPercent': 0.25,
-    },
-    {
-      'nama': 'Istana Maimun',
-      'kategori': 'Sejarah',
-      'rating': 4.7,
-      'jarak_km': 1.8,
-      'icon': Icons.account_balance,
-      'topPercent': 0.50,
-      'leftPercent': 0.60,
-    },
-    {
-      'nama': 'Gereja Immanuel',
-      'kategori': 'Religi',
-      'rating': 4.6,
-      'jarak_km': 3.1,
-      'icon': Icons.church,
-      'topPercent': 0.55,
-      'leftPercent': 0.20,
-    },
-    {
-      'nama': 'Soto Kesawan',
-      'kategori': 'Kuliner',
-      'rating': 4.9,
-      'jarak_km': 0.8,
-      'icon': Icons.ramen_dining,
-      'topPercent': 0.38,
-      'leftPercent': 0.55,
-    },
-  ];
-
-  int _selectedIndex = 0;
-  late AnimationController _sheetController;
-  bool _isDragging = false;
-
-  // Card height for the slide calculation
-  static const double _cardMaxSlide = 280.0;
+class _MapPageState extends State<MapPage> {
+  final MapController _mapController = MapController();
+  List<Map<String, dynamic>> _allDestinasi = [];
+  List<Marker> _markers = [];
+  bool _isLoading = true;
+  String _selectedCategory = 'Semua';
 
   @override
   void initState() {
     super.initState();
-    _sheetController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 350),
-    );
-    // Start with sheet visible (value=1 means fully open)
-    _sheetController.value = 1.0;
+    _loadMarkers();
   }
 
-  @override
-  void dispose() {
-    _sheetController.dispose();
-    super.dispose();
-  }
+  Future<void> _loadMarkers() async {
+    setState(() => _isLoading = true);
+    try {
+      final supabase = Supabase.instance.client;
 
-  bool get _isSheetVisible => _sheetController.value > 0.5;
+      // Check if user session exists
+      final session = supabase.auth.currentSession;
+      print('Session: $session');
 
-  void _selectLocation(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-    // Always open if tapping a pin
-    _sheetController.animateTo(1.0, curve: Curves.easeOutCubic);
-  }
+      final response = await supabase
+          .from('destinasi')
+          .select('id, nama, kategori, deskripsi, latitude, longitude, rating, foto_utama_url')
+          .eq('is_active', true);
 
-  void _onDragUpdate(DragUpdateDetails details) {
-    if (!_isDragging) {
-      _isDragging = true;
-    }
-    // Drag down = negative delta on controller value
-    // Drag up = positive delta on controller value
-    final double delta = -details.primaryDelta! / _cardMaxSlide;
-    _sheetController.value = (_sheetController.value + delta).clamp(0.0, 1.0);
-  }
+      print('Response: $response');
+      print('Count: ${response.length}');
 
-  void _onDragEnd(DragEndDetails details) {
-    _isDragging = false;
-    final double velocity = details.primaryVelocity ?? 0;
+      if (response.isEmpty) {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Belum ada destinasi tersedia')));
+        }
+        return;
+      }
 
-    // Fast swipe: respect direction
-    if (velocity > 500) {
-      // Swipe down fast → close
-      _sheetController.animateTo(0.0, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
-    } else if (velocity < -500) {
-      // Swipe up fast → open
-      _sheetController.animateTo(1.0, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
-    } else {
-      // Slow drag: snap to closest state
-      if (_sheetController.value > 0.5) {
-        _sheetController.animateTo(1.0, curve: Curves.easeOutCubic);
-      } else {
-        _sheetController.animateTo(0.0, curve: Curves.easeOutCubic);
+      final List<Map<String, dynamic>> data =
+          List<Map<String, dynamic>>.from(response);
+
+      setState(() {
+        _allDestinasi = data;
+        _buildMarkers(data);
+        _isLoading = false;
+      });
+    } catch (e, stackTrace) {
+      print('Error loading markers: $e');
+      print('Stack trace: $stackTrace');
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          duration: const Duration(seconds: 5),
+          backgroundColor: Colors.red,
+        ));
       }
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final screenH = MediaQuery.of(context).size.height;
-    final screenW = MediaQuery.of(context).size.width;
-    final selected = _locations[_selectedIndex];
-
-    return Stack(
-      children: [
-        // Dummy Map Background
-        Container(
-          color: AppColors.primaryLight.withAlpha(80),
-          width: double.infinity,
-          height: double.infinity,
-          child: CustomPaint(
-            painter: _GridPainter(),
-          ),
-        ),
-
-        // Clickable Map Pins
-        ..._locations.asMap().entries.map((entry) {
-          final idx = entry.key;
-          final loc = entry.value;
-          final isSelected = idx == _selectedIndex;
-          return Positioned(
-            top: screenH * (loc['topPercent'] as double),
-            left: screenW * (loc['leftPercent'] as double),
-            child: GestureDetector(
-              onTap: () => _selectLocation(idx),
-              child: _buildMapPin(
-                loc['icon'] as IconData,
-                isSelected ? AppColors.primary : AppColors.primary.withAlpha(160),
-                isSelected,
-              ),
-            ),
-          );
-        }),
-
-        // My Location blue dot
-        Positioned(
-          top: screenH * 0.46,
-          left: screenW * 0.45,
+  void _buildMarkers(List<Map<String, dynamic>> data) {
+    _markers = data.map((dest) {
+      return Marker(
+        point: LatLng(
+            (dest['latitude'] as num?)?.toDouble() ?? 0.0,
+            (dest['longitude'] as num?)?.toDouble() ?? 0.0),
+        width: 40,
+        height: 40,
+        child: GestureDetector(
+          onTap: () => _showBottomSheet(dest),
           child: Container(
-            width: 14,
-            height: 14,
             decoration: BoxDecoration(
-              color: Colors.blue,
+              color: const Color(0xFF1A6B4A),
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white, width: 2),
+              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
             ),
+            child: const Icon(Icons.place, color: Colors.white, size: 20),
           ),
         ),
+      );
+    }).toList();
+  }
 
-        // Near me FAB
-        Positioned(
-          bottom: _isSheetVisible ? 310 : 100,
-          right: 16,
-          child: FloatingActionButton(
-            heroTag: 'nearMeBtn',
-            mini: true,
-            backgroundColor: Colors.white,
-            onPressed: () {},
-            child: const Icon(Icons.near_me_outlined, color: AppColors.textPrimary),
-          ),
-        ),
+  Future<void> _openNavigation(double lat, double lng, String nama) async {
+    // Try Google Maps app first
+    final googleMapsUrl = Uri.parse(
+      'google.navigation:q=$lat,$lng&mode=d'
+    );
 
-        // Search Bar at Top
-        Positioned(
-          top: 16,
-          left: 16,
-          right: 16,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(10),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Cari lokasi...',
-                hintStyle: const TextStyle(color: AppColors.textTertiary),
-                prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
-                suffixIcon: const Icon(Icons.tune, color: AppColors.textSecondary),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: AppColors.primary, width: 2.0),
-                ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 16),
+    // Fallback to browser Google Maps if app not installed
+    final googleMapsBrowser = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&destination_place_name=${Uri.encodeComponent(nama)}&travelmode=driving'
+    );
+
+    if (await canLaunchUrl(googleMapsUrl)) {
+      await launchUrl(googleMapsUrl);
+    } else if (await canLaunchUrl(googleMapsBrowser)) {
+      await launchUrl(googleMapsBrowser, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Tidak dapat membuka navigasi')));
+      }
+    }
+  }
+
+  void _filterByCategory(String category) {
+    setState(() => _selectedCategory = category);
+    if (category == 'Semua') {
+      _buildMarkers(_allDestinasi);
+    } else {
+      final filtered = _allDestinasi
+          .where((d) => d['kategori'] == category)
+          .toList();
+      _buildMarkers(filtered);
+    }
+  }
+
+  void _showBottomSheet(Map<String, dynamic> dest) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-          ),
-        ),
-
-        // Swipeable Bottom Card — follows finger
-        AnimatedBuilder(
-          animation: _sheetController,
-          builder: (context, child) {
-            final double slideOffset = _cardMaxSlide * (1 - _sheetController.value);
-            return Positioned(
-              bottom: 20 - slideOffset,
-              left: 16,
-              right: 16,
-              child: GestureDetector(
-                onVerticalDragUpdate: _onDragUpdate,
-                onVerticalDragEnd: _onDragEnd,
-                child: child!,
-              ),
-            );
-          },
-          child: _buildBottomCard(selected),
-        ),
-
-        // "Lihat Detail" hint when card is mostly hidden
-        AnimatedBuilder(
-          animation: _sheetController,
-          builder: (context, child) {
-            // Only show when card is mostly hidden
-            final opacity = (1 - _sheetController.value * 3).clamp(0.0, 1.0);
-            if (opacity <= 0) return const SizedBox.shrink();
-            return Positioned(
-              bottom: 20,
-              left: 0,
-              right: 0,
-              child: Opacity(
-                opacity: opacity,
-                child: GestureDetector(
-                  onVerticalDragUpdate: _onDragUpdate,
-                  onVerticalDragEnd: _onDragEnd,
-                  onTap: () {
-                    _sheetController.animateTo(1.0, curve: Curves.easeOutCubic);
-                  },
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: const [
-                          BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 2)),
-                        ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: dest['foto_utama_url'] != null
+                      ? Image.network(
+                          dest['foto_utama_url'],
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stack) => Container(
+                            width: 80,
+                            height: 80,
+                            color: const Color(0xFFE8F5EE),
+                            child: const Icon(Icons.place, color: Color(0xFF1A6B4A), size: 40),
+                          ),
+                        )
+                      : Container(
+                          width: 80,
+                          height: 80,
+                          color: const Color(0xFFE8F5EE),
+                          child: const Icon(Icons.place, color: Color(0xFF1A6B4A), size: 40),
+                        ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        dest['nama'] ?? '',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(Icons.keyboard_arrow_up, color: AppColors.primary, size: 20),
-                          SizedBox(width: 4),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8F5EE),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              dest['kategori'] ?? '',
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF1A6B4A)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.star, color: Colors.amber, size: 14),
                           Text(
-                            'Lihat Detail',
-                            style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13),
+                            ' ${dest['rating'] ?? 0}',
+                            style: const TextStyle(fontSize: 12),
                           ),
                         ],
                       ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  flex: 1,
+                  child: SizedBox(
+                    height: 48,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        // Pass adapted destinasi map to old DetailPage format
+                        // Using empty string for image since it's not present here
+                        dest['image_url'] = dest['foto_utama_url'] ?? '';
+                        dest['jarak_km'] = '2.3';
+                        dest['filter'] = dest['kategori'];
+                        
+                        Navigator.pop(context); // close sheet
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => DetailPage(destinasi: dest),
+                          ),
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFF1A6B4A)),
+                        foregroundColor: const Color(0xFF1A6B4A),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Lihat Detail',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            );
-          },
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 1,
+                  child: SizedBox(
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context); // tutup bottom sheet
+                        _openNavigation(
+                          (dest['latitude'] as num).toDouble(),
+                          (dest['longitude'] as num).toDouble(),
+                          dest['nama'] ?? '',
+                        );
+                      },
+                      icon: const Icon(Icons.explore, size: 16, color: Colors.white),
+                      label: const Text(
+                        'Navigasi',
+                        style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+                        maxLines: 1,
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1A6B4A),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildBottomCard(Map<String, dynamic> location) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 15,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
         children: [
-          // Drag Handle
-          Container(
-            width: 48,
-            height: 5,
-            margin: const EdgeInsets.only(bottom: 20),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(3),
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: const LatLng(3.5952, 98.6722),
+              initialZoom: 13,
+              interactionOptions: const InteractionOptions(
+                flags: InteractiveFlag.all,
+              ),
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.delira.app',
+              ),
+              MarkerLayer(markers: _markers),
+            ],
+          ),
+          
+          if (_isLoading)
+            const Center(
+              child: CircularProgressIndicator(color: Color(0xFF1A6B4A)),
+            ),
+
+          Positioned(
+            top: 48, // slightly lower to account for status bar since no appbar
+            left: 16,
+            right: 16,
+            child: Column(
+              children: [
+                // Search bar
+                Container(
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
+                  ),
+                  child: const TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Cari lokasi...',
+                      prefixIcon: Icon(Icons.search, color: Color(0xFF1A6B4A)),
+                      suffixIcon: Icon(Icons.tune, color: Color(0xFF1A6B4A)),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // Category chips horizontal scroll
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: ['Semua', 'Sejarah', 'Religi', 'Kuliner', 'Budaya'].map((cat) {
+                      final isActive = _selectedCategory == cat;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: FilterChip(
+                          label: Text(cat),
+                          selected: isActive,
+                          onSelected: (_) => _filterByCategory(cat),
+                          selectedColor: const Color(0xFF1A6B4A),
+                          backgroundColor: Colors.white,
+                          labelStyle: TextStyle(
+                            color: isActive ? Colors.white : const Color(0xFF1A6B4A),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          side: const BorderSide(color: Color(0xFF1A6B4A)),
+                          showCheckmark: false,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
             ),
           ),
-          Row(
-            children: [
-              Container(
-                width: 68,
-                height: 68,
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Center(
-                  child: Icon(location['icon'] as IconData, color: AppColors.primary, size: 36),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      location['nama'] as String,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Text(
-                          location['kategori'] as String,
-                          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                        ),
-                        const SizedBox(width: 8),
-                        const Text('•', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                        const SizedBox(width: 8),
-                        const Icon(Icons.star, color: Colors.amber, size: 18),
-                        const SizedBox(width: 4),
-                        Text(
-                          location['rating'].toString(),
-                          style: const TextStyle(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(width: 10),
-                        const Text('•', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
-                        const SizedBox(width: 10),
-                        Text(
-                          '${location['jarak_km']} km',
-                          style: const TextStyle(fontSize: 14, color: AppColors.primary, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () async {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => DetailPage(destinasi: location),
-                      ),
-                    );
-                    if (result == 'GO_TO_HOTEL' && widget.onHotelRequested != null) {
-                      widget.onHotelRequested!();
-                    }
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: const BorderSide(color: AppColors.primary, width: 1.5),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  child: const Text('Detail', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {},
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  child: const Text('Navigasi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                ),
-              ),
-            ],
+          
+          Positioned(
+            right: 16,
+            bottom: 100,
+            child: FloatingActionButton.small(
+              heroTag: 'myLocBtn',
+              onPressed: () async {
+                LocationPermission permission = await Geolocator.checkPermission();
+                if (permission == LocationPermission.denied) {
+                  permission = await Geolocator.requestPermission();
+                }
+                if (permission == LocationPermission.deniedForever) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Izin lokasi ditolak permanen. Silakan ubah di pengaturan.')),
+                  );
+                  return;
+                }
+                if (permission == LocationPermission.whileInUse ||
+                    permission == LocationPermission.always) {
+                  Position pos = await Geolocator.getCurrentPosition();
+                  _mapController.move(LatLng(pos.latitude, pos.longitude), 15);
+                } else {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Izin lokasi ditolak')),
+                  );
+                }
+              },
+              backgroundColor: Colors.white,
+              foregroundColor: const Color(0xFF1A6B4A),
+              elevation: 4,
+              child: const Icon(Icons.my_location),
+            ),
           ),
         ],
       ),
     );
   }
-
-  Widget _buildMapPin(IconData icon, Color color, bool isSelected) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          padding: EdgeInsets.all(isSelected ? 10 : 8),
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: isSelected ? 3 : 2),
-            boxShadow: [
-              BoxShadow(
-                color: isSelected ? AppColors.primary.withAlpha(100) : Colors.black26,
-                blurRadius: isSelected ? 12 : 6,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Icon(icon, color: Colors.white, size: isSelected ? 22 : 18),
-        ),
-        Container(
-          width: 3,
-          height: isSelected ? 18 : 14,
-          color: color,
-        ),
-        Container(
-          width: isSelected ? 10 : 7,
-          height: isSelected ? 10 : 7,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _GridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.border.withAlpha(50)
-      ..strokeWidth = 1.0;
-
-    const double spacing = 40.0;
-
-    for (double i = 0; i < size.width; i += spacing) {
-      canvas.drawLine(Offset(i, 0), Offset(i, size.height), paint);
-    }
-    for (double i = 0; i < size.height; i += spacing) {
-      canvas.drawLine(Offset(0, i), Offset(size.width, i), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

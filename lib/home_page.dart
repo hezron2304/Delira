@@ -150,6 +150,7 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: _currentIndex == 4,
       backgroundColor: AppColors.surface,
       body: SafeArea(
         bottom: false,
@@ -158,7 +159,7 @@ class _HomePageState extends State<HomePage> {
             : _currentIndex == 2
                 ? const HotelPage()
                 : _currentIndex == 4
-                    ? const AIGuidePage()
+                    ? AIGuidePage(onBackPressed: () => setState(() => _currentIndex = 0))
                     : _currentIndex == 1
                     ? MapPage(onHotelRequested: () {
                         setState(() {
@@ -185,8 +186,8 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
       ),
-      bottomNavigationBar: _buildBottomNav(),
-      floatingActionButton: Transform.translate(
+      bottomNavigationBar: _currentIndex == 4 ? const SizedBox.shrink() : _buildBottomNav(),
+      floatingActionButton: _currentIndex == 4 ? null : Transform.translate(
         offset: const Offset(0, 14), // Mendorong FAB agak ke bawah
         child: SizedBox(
           width: 66,
