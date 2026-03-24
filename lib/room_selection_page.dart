@@ -272,7 +272,7 @@ class _RoomSelectionPageState extends State<RoomSelectionPage> {
                     else
                       const SizedBox(),
                     ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () => _showBookingSuccessDialog(context, room),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
@@ -288,6 +288,61 @@ class _RoomSelectionPageState extends State<RoomSelectionPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showBookingSuccessDialog(BuildContext context, Map<String, dynamic> room) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check_circle, color: Colors.green, size: 64),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Pemesanan Berhasil!',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Kamar ${room['name']} di ${widget.hotel['name']} telah berhasil dipesan untuk 20 - 22 Juli 2025.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 14, height: 1.5),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(); // Tutup dialog
+                    Navigator.of(context).pop(); // Kembali ke detail hotel
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  child: const Text('Selesai', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

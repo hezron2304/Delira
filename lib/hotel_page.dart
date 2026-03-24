@@ -22,7 +22,7 @@ class _HotelPageState extends State<HotelPage> {
       'rating': 4.8,
       'distance': '0.5 km',
       'price': 'Rp 850.000',
-      'image': 'https://images.unsplash.com/photo-1564501049412-61c2a3083791?auto=format&fit=crop&q=80',
+      'image': 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80',
     },
     {
       'name': 'Hotel Aryaduta Medan',
@@ -36,28 +36,28 @@ class _HotelPageState extends State<HotelPage> {
       'rating': 4.3,
       'distance': '1.2 km',
       'price': 'Rp 400.000',
-      'image': 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&q=80',
+      'image': 'https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&q=80',
     },
     {
       'name': 'Novotel Medan',
       'rating': 4.5,
       'distance': '0.8 km',
       'price': 'Rp 750.000',
-      'image': 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80',
+      'image': 'https://images.unsplash.com/photo-1582719478250-c89cae4df85d?auto=format&fit=crop&q=80',
     },
     {
       'name': 'JW Marriott Medan',
       'rating': 4.9,
       'distance': '1.5 km',
       'price': 'Rp 1.200.000',
-      'image': 'https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&q=80',
+      'image': 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&q=80',
     },
     {
       'name': 'Santika Premiere Dyandra',
       'rating': 4.4,
       'distance': '2.0 km',
       'price': 'Rp 480.000',
-      'image': 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&q=80',
+      'image': 'https://images.unsplash.com/photo-1571003123894-1f0594d2b5d9?auto=format&fit=crop&q=80',
     },
   ];
 

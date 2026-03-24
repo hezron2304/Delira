@@ -73,7 +73,7 @@ class _HomePageState extends State<HomePage> {
             'rating': 4.8,
             'jarak_km': 2.3,
             'is_featured': true,
-            'image_url': 'https://images.unsplash.com/photo-1565552643983-6df3d12ebd83?auto=format&fit=crop&q=80',
+            'image_url': 'https://images.unsplash.com/photo-1596422846543-75c6fc18a593?auto=format&fit=crop&q=80', // Masjid Raya Medan
             'icon': Icons.mosque,
           },
           {
@@ -84,18 +84,14 @@ class _HomePageState extends State<HomePage> {
             'rating': 4.7,
             'jarak_km': 1.8,
             'is_featured': true,
-            'image_url': 'https://images.unsplash.com/photo-1582539097950-7164998273f3?auto=format&fit=crop&q=80',
+            'image_url': 'https://images.unsplash.com/photo-1600100397500-1286c0032644?auto=format&fit=crop&q=80', // Istana Maimun
             'icon': Icons.account_balance,
           },
           {
             'kategori': 'Religi',
             'badge': 'Religi',
             'filter': 'Religi',
-            'nama': 'Gereja Immanuel',
-            'rating': 4.6,
-            'jarak_km': 3.1,
-            'is_featured': false,
-            'image_url': '',
+            'image_url': 'https://images.unsplash.com/photo-1612440938166-51d2005470cd?auto=format&fit=crop&q=80', // Gereja Immanuel
             'icon': Icons.church,
           },
           {
