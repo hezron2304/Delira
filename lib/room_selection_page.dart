@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:delira/theme/app_colors.dart';
+import 'package:delira/checkout_page.dart';
 
 class RoomSelectionPage extends StatefulWidget {
   final Map<String, dynamic> hotel;
@@ -11,9 +12,27 @@ class RoomSelectionPage extends StatefulWidget {
 }
 
 class _RoomSelectionPageState extends State<RoomSelectionPage> {
+  DateTime _checkIn = DateTime.now().add(const Duration(days: 1));
+  DateTime _checkOut = DateTime.now().add(const Duration(days: 3));
+  int _roomsCount = 1;
   int _adultsCount = 2;
   int _childrenCount = 0;
 
+  // ----- Computed Helpers -----
+  int get _nightCount => _checkOut.difference(_checkIn).inDays.abs().clamp(1, 365);
+
+  String _formatDate(DateTime d) {
+    const months = [
+      '', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+    ];
+    return '${d.day} ${months[d.month]} ${d.year}';
+  }
+
+  String get _guestSummary =>
+      '$_roomsCount Kamar, $_adultsCount Dewasa, $_childrenCount Anak';
+
+  // ----- Room Data -----
   final List<Map<String, dynamic>> _rooms = [
     {
       'name': 'Deluxe Double',
@@ -29,10 +48,55 @@ class _RoomSelectionPageState extends State<RoomSelectionPage> {
       'size': '24 m²',
       'bed': 'Twin Bed',
       'feature': 'Shower',
-      'left': 0, // 0 means don't show the badge or show different
+      'left': 0,
     },
   ];
 
+  // ================================================================
+  //  DATE PICKER DIALOG
+  // ================================================================
+  void _openDatePicker() {
+    showDialog(
+      context: context,
+      useSafeArea: false,
+      builder: (ctx) => _DatePickerDialog(
+        initialCheckIn: _checkIn,
+        initialCheckOut: _checkOut,
+        onConfirm: (ci, co) {
+          setState(() {
+            _checkIn = ci;
+            _checkOut = co;
+          });
+        },
+      ),
+    );
+  }
+
+  // ================================================================
+  //  GUEST PICKER DIALOG
+  // ================================================================
+  void _openGuestPicker() {
+    showDialog(
+      context: context,
+      useSafeArea: false,
+      builder: (ctx) => _GuestPickerDialog(
+        initialRooms: _roomsCount,
+        initialAdults: _adultsCount,
+        initialChildren: _childrenCount,
+        onConfirm: (rooms, adults, children) {
+          setState(() {
+            _roomsCount = rooms;
+            _adultsCount = adults;
+            _childrenCount = children;
+          });
+        },
+      ),
+    );
+  }
+
+  // ================================================================
+  //  BUILD
+  // ================================================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -49,11 +113,17 @@ class _RoomSelectionPageState extends State<RoomSelectionPage> {
           children: [
             const Text(
               'Pilih Kamar',
-              style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 20),
+              style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20),
             ),
             Text(
-              widget.hotel['name'] ?? 'Grand Mercure Medan',
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.normal),
+              widget.hotel['name'] ?? 'Hotel',
+              style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.normal),
             ),
           ],
         ),
@@ -63,143 +133,166 @@ class _RoomSelectionPageState extends State<RoomSelectionPage> {
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           children: [
-            _buildDateSelector(),
-            const SizedBox(height: 20),
-            _buildGuestSelector(),
-            const SizedBox(height: 32),
+            // ---- Summary Card ----
+            _buildSummaryCard(),
+            const SizedBox(height: 28),
+            // ---- Room Cards ----
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _rooms.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 24),
-              itemBuilder: (context, index) => _buildRoomCard(_rooms[index]),
+              separatorBuilder: (context, index) =>
+                  const SizedBox(height: 20),
+              itemBuilder: (context, index) =>
+                  _buildRoomCard(_rooms[index]),
             ),
+            const SizedBox(height: 40),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDateSelector() {
+  // ---- Summary Card (Date Row + Guest Row) ----
+  Widget _buildSummaryCard() {
     return Container(
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border),
       ),
-      child: Row(
+      child: Column(
         children: [
-          const Icon(Icons.calendar_today_outlined, color: AppColors.primary, size: 24),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text('Check-in', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                    SizedBox(height: 4),
-                    Text('20 Jul 2025', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  ],
-                ),
-                const Icon(Icons.swap_horiz, color: AppColors.textSecondary, size: 20),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text('Check-out', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                    SizedBox(height: 4),
-                    Text('22 Jul 2025', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                  ],
-                ),
-              ],
+          // Date Row
+          InkWell(
+            onTap: _openDatePicker,
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(20)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 20, vertical: 18),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Icon(Icons.calendar_today_outlined,
+                      color: AppColors.primary, size: 22),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Tanggal Menginap',
+                            style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500)),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                _formatDate(_checkIn),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: AppColors.textPrimary),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const Padding(
+                              padding:
+                                  EdgeInsets.symmetric(horizontal: 6),
+                              child: Icon(Icons.swap_horiz,
+                                  color: AppColors.textSecondary,
+                                  size: 18),
+                            ),
+                            Flexible(
+                              child: Text(
+                                _formatDate(_checkOut),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: AppColors.textPrimary),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryLight,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '$_nightCount malam',
+                      style: const TextStyle(
+                          color: AppColors.primaryDark,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(width: 16),
-          const Text(
-            '2 malam',
-            style: TextStyle(color: AppColors.primaryDark, fontWeight: FontWeight.w600, fontSize: 13),
+          // Divider
+          const Divider(height: 1, thickness: 1, color: AppColors.border),
+          // Guest Row
+          InkWell(
+            onTap: _openGuestPicker,
+            borderRadius:
+                const BorderRadius.vertical(bottom: Radius.circular(20)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 20, vertical: 18),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Icon(Icons.people_alt_outlined,
+                      color: AppColors.primary, size: 22),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Tamu & Kamar',
+                            style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500)),
+                        const SizedBox(height: 4),
+                        Text(
+                          _guestSummary,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: AppColors.textPrimary),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right,
+                      color: AppColors.textSecondary, size: 22),
+                ],
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildGuestSelector() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.people_outline, color: AppColors.primary, size: 24),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Tamu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    _buildCounter(
-                      _adultsCount,
-                      'Dewasa',
-                      (val) => setState(() => _adultsCount = (_adultsCount + val).clamp(1, 10)),
-                    ),
-                    const SizedBox(width: 24),
-                    _buildCounter(
-                      _childrenCount,
-                      'Anak',
-                      (val) => setState(() => _childrenCount = (_childrenCount + val).clamp(0, 10)),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCounter(int count, String label, Function(int) onUpdate) {
-    return Row(
-      children: [
-        GestureDetector(
-          onTap: () => onUpdate(-1),
-          child: Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(border: Border.all(color: AppColors.border), shape: BoxShape.circle, color: Colors.white),
-            child: const Icon(Icons.remove, size: 16, color: AppColors.textSecondary),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(count.toString(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-            Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
-          ],
-        ),
-        const SizedBox(width: 12),
-        GestureDetector(
-          onTap: () => onUpdate(1),
-          child: Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(border: Border.all(color: AppColors.border), shape: BoxShape.circle, color: Colors.white),
-            child: const Icon(Icons.add, size: 16, color: AppColors.textSecondary),
-          ),
-        ),
-      ],
-    );
-  }
-
+  // ---- Room Card ----
   Widget _buildRoomCard(Map<String, dynamic> room) {
     return Container(
       decoration: BoxDecoration(
@@ -210,16 +303,17 @@ class _RoomSelectionPageState extends State<RoomSelectionPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image placeholder
           Container(
             height: 120,
             width: double.infinity,
             decoration: const BoxDecoration(
               color: AppColors.surface,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(19)),
+              borderRadius:
+                  BorderRadius.vertical(top: Radius.circular(19)),
             ),
             child: const Center(
-              child: Icon(Icons.hotel, color: AppColors.primary, size: 48),
+              child: Icon(Icons.hotel,
+                  color: AppColors.primary, size: 48),
             ),
           ),
           Padding(
@@ -229,30 +323,48 @@ class _RoomSelectionPageState extends State<RoomSelectionPage> {
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      room['name'],
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.textPrimary),
+                    Flexible(
+                      child: Text(
+                        room['name'],
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: AppColors.textPrimary),
+                      ),
                     ),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
                           room['price'],
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.primaryDark),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                              color: AppColors.primaryDark),
                         ),
-                        const Text('/malam', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                        const Text('/malam',
+                            style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 11)),
                       ],
                     ),
                   ],
                 ),
-                Text(room['size'], style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                const SizedBox(height: 4),
+                Text(room['size'],
+                    style: const TextStyle(
+                        color: AppColors.textSecondary, fontSize: 13)),
                 const SizedBox(height: 16),
                 Wrap(
                   spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    _buildSmallChip(Icons.hotel_outlined, room['bed']),
-                    _buildSmallChip(Icons.bathtub_outlined, room['feature']),
+                    _buildSmallChip(
+                        Icons.hotel_outlined, room['bed']),
+                    _buildSmallChip(
+                        Icons.bathtub_outlined, room['feature']),
                     _buildSmallChip(Icons.wifi, 'WiFi'),
                   ],
                 ),
@@ -261,26 +373,66 @@ class _RoomSelectionPageState extends State<RoomSelectionPage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     if (room['left'] > 0)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(color: Colors.amber.shade100, borderRadius: BorderRadius.circular(20)),
-                        child: Text(
-                          '${room['left']} kamar tersisa',
-                          style: TextStyle(color: Colors.amber.shade900, fontWeight: FontWeight.bold, fontSize: 12),
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                              color: Colors.amber.shade100,
+                              borderRadius:
+                                  BorderRadius.circular(20)),
+                          child: Text(
+                            '${room['left']} kamar tersisa',
+                            style: TextStyle(
+                                color: Colors.amber.shade900,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12),
+                          ),
                         ),
                       )
                     else
                       const SizedBox(),
+                    const SizedBox(width: 8),
                     ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        // Parse price from String "Rp 850.000" to int 850000
+                        final rawPrice = room['price'] as String;
+                        final parsedPrice = int.tryParse(
+                          rawPrice.replaceAll(RegExp(r'[^0-9]'), '')
+                        ) ?? 0;
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CheckoutPage(
+                              hotelName: widget.hotel['name'] ?? 'Hotel',
+                              roomType: room['name'],
+                              roomPrice: parsedPrice,
+                              checkIn: _checkIn,
+                              checkOut: _checkOut,
+                              nights: _nightCount,
+                              rooms: _roomsCount,
+                              adults: _adultsCount,
+                              children: _childrenCount,
+                            ),
+                          ),
+                        );
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        disabledBackgroundColor: AppColors.border,
+                        disabledForegroundColor: AppColors.textSecondary,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 32, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(12)),
                         elevation: 0,
                       ),
-                      child: const Text('Pilih', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text('Pilih',
+                          style:
+                              TextStyle(fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
@@ -294,15 +446,607 @@ class _RoomSelectionPageState extends State<RoomSelectionPage> {
 
   Widget _buildSmallChip(IconData icon, String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(8)),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(8)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, color: AppColors.textSecondary, size: 14),
           const SizedBox(width: 6),
-          Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w500)),
+          Text(label,
+              style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500)),
         ],
+      ),
+    );
+  }
+}
+
+// ================================================================
+//  DATE PICKER DIALOG
+// ================================================================
+class _DatePickerDialog extends StatefulWidget {
+  final DateTime initialCheckIn;
+  final DateTime initialCheckOut;
+  final void Function(DateTime checkIn, DateTime checkOut) onConfirm;
+
+  const _DatePickerDialog({
+    required this.initialCheckIn,
+    required this.initialCheckOut,
+    required this.onConfirm,
+  });
+
+  @override
+  State<_DatePickerDialog> createState() => _DatePickerDialogState();
+}
+
+class _DatePickerDialogState extends State<_DatePickerDialog> {
+  late DateTime _checkIn;
+  DateTime? _checkOut;
+  late DateTime _displayMonth;
+
+  // Selecting phase: 0 = picking check-in, 1 = picking check-out
+  int _phase = 0;
+
+  static const _weekLabels = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+  static const _monthNames = [
+    '', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _checkIn = widget.initialCheckIn;
+    _checkOut = widget.initialCheckOut;
+    _displayMonth = DateTime(_checkIn.year, _checkIn.month, 1);
+  }
+
+  String _formatFull(DateTime? d) {
+    if (d == null) return 'Pilih tanggal';
+    const months = [
+      '', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+    ];
+    return '${d.day} ${months[d.month]} ${d.year}';
+  }
+
+  int get _nightCount => _checkOut == null ? 0 : _checkOut!.difference(_checkIn).inDays.abs().clamp(0, 365);
+
+  void _onDayTap(DateTime day) {
+    setState(() {
+      if (_phase == 0) {
+        // State 1: Selecting Check-In
+        _checkIn = day;
+        _checkOut = null;
+        _phase = 1;
+      } else {
+        // State 2: Selecting Check-Out
+        if (day.isAfter(_checkIn)) {
+          _checkOut = day;
+          _phase = 0;
+        } else {
+          // Tapped before or equal to check-in -> treat as new check-in
+          _checkIn = day;
+          _checkOut = null;
+          _phase = 1;
+        }
+      }
+    });
+  }
+
+  bool _isSameDay(DateTime a, DateTime? b) {
+    if (b == null) return false;
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  bool _isInRange(DateTime d) {
+    if (_checkOut == null) return false;
+    return d.isAfter(_checkIn) && d.isBefore(_checkOut!);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final today = DateTime.now();
+
+    // Calculate calendar grid
+    // Week starts Monday (weekday 1). Dart: Mon=1 … Sun=7
+    final firstDay = _displayMonth;
+    final daysInMonth = DateUtils.getDaysInMonth(firstDay.year, firstDay.month);
+    int startOffset = firstDay.weekday - 1; // 0 = Mon offset
+
+    final List<DateTime?> calCells = [];
+    for (int i = 0; i < startOffset; i++) { calCells.add(null); }
+    for (int d = 1; d <= daysInMonth; d++) {
+      calCells.add(DateTime(firstDay.year, firstDay.month, d));
+    }
+    // Pad to complete rows
+    while (calCells.length % 7 != 0) { calCells.add(null); }
+
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Container(
+              color: AppColors.primary,
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 16),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 4),
+                  const Text(
+                    'Tanggal Menginap',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18),
+                  ),
+                ],
+              ),
+            ),
+
+            // Month nav
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new,
+                        color: AppColors.textPrimary, size: 18),
+                    onPressed: () => setState(() => _displayMonth =
+                        DateTime(_displayMonth.year, _displayMonth.month - 1, 1)),
+                  ),
+                  Text(
+                    '${_monthNames[_displayMonth.month]} ${_displayMonth.year}',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: AppColors.textPrimary),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.arrow_forward_ios,
+                        color: AppColors.textPrimary, size: 18),
+                    onPressed: () => setState(() => _displayMonth =
+                        DateTime(_displayMonth.year, _displayMonth.month + 1, 1)),
+                  ),
+                ],
+              ),
+            ),
+
+            // Day-of-week headers
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: _weekLabels
+                    .map((lbl) => Expanded(
+                          child: Center(
+                            child: Text(lbl,
+                                style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textSecondary)),
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Calendar grid
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 7,
+                    childAspectRatio: 1,
+                  ),
+                  itemCount: calCells.length,
+                  itemBuilder: (ctx, i) {
+                    final day = calCells[i];
+                    if (day == null) return const SizedBox();
+
+                    final isCheckIn = _isSameDay(day, _checkIn);
+                    final isCheckOut = _isSameDay(day, _checkOut);
+                    final inRange = _isInRange(day);
+                    final isToday = _isSameDay(day, today);
+                    final isPast = day.isBefore(DateTime(today.year, today.month, today.day));
+
+                    Color bgColor = Colors.transparent;
+                    Color textColor = isPast
+                        ? AppColors.textSecondary.withAlpha(100)
+                        : AppColors.textPrimary;
+                    FontWeight fw = FontWeight.normal;
+
+                    if (isCheckIn || isCheckOut) {
+                      bgColor = AppColors.primary;
+                      textColor = Colors.white;
+                      fw = FontWeight.bold;
+                    } else if (inRange) {
+                      bgColor = AppColors.primaryLight;
+                      textColor = AppColors.primaryDark;
+                    }
+
+                    return GestureDetector(
+                      onTap: isPast ? null : () => _onDayTap(day),
+                      child: Container(
+                        margin: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          color: bgColor,
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${day.day}',
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: fw,
+                                    color: textColor),
+                              ),
+                              if (isToday && !isCheckIn && !isCheckOut)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 3, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: inRange
+                                        ? AppColors.primaryDark
+                                        : AppColors.primary,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    'Hari ini',
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 7,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+
+            // Bottom Summary + Button
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withAlpha(20),
+                      blurRadius: 12,
+                      offset: const Offset(0, -4))
+                ],
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      _buildDateSummaryBox(
+                          'Check-in', _formatFull(_checkIn), false),
+                      Padding(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 10),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.arrow_forward,
+                                color: AppColors.textSecondary, size: 18),
+                            Text(_checkOut == null ? '-' : '$_nightCount malam',
+                                style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                      _buildDateSummaryBox(
+                          'Check-out', _formatFull(_checkOut), _checkOut == null),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: _checkOut == null ? null : () {
+                        widget.onConfirm(_checkIn, _checkOut!);
+                        Navigator.pop(context);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: AppColors.border,
+                        disabledForegroundColor: AppColors.textSecondary,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('Lanjutkan',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 16)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDateSummaryBox(String label, String value, bool isGreyedOut) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label,
+                style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500)),
+            const SizedBox(height: 4),
+            Text(value,
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: isGreyedOut ? AppColors.textSecondary : AppColors.textPrimary),
+                overflow: TextOverflow.ellipsis),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ================================================================
+//  GUEST PICKER DIALOG
+// ================================================================
+class _GuestPickerDialog extends StatefulWidget {
+  final int initialRooms;
+  final int initialAdults;
+  final int initialChildren;
+  final void Function(int rooms, int adults, int children) onConfirm;
+
+  const _GuestPickerDialog({
+    required this.initialRooms,
+    required this.initialAdults,
+    required this.initialChildren,
+    required this.onConfirm,
+  });
+
+  @override
+  State<_GuestPickerDialog> createState() => _GuestPickerDialogState();
+}
+
+class _GuestPickerDialogState extends State<_GuestPickerDialog> {
+  late int _rooms;
+  late int _adults;
+  late int _children;
+
+  @override
+  void initState() {
+    super.initState();
+    _rooms = widget.initialRooms;
+    _adults = widget.initialAdults;
+    _children = widget.initialChildren;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header
+            Container(
+              color: AppColors.primary,
+              padding: const EdgeInsets.fromLTRB(8, 12, 16, 16),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 4),
+                  const Expanded(
+                    child: Text(
+                      'Tambahkan Tamu & Kamar',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Stepper rows
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 8),
+                    _buildStepperRow(
+                      icon: Icons.meeting_room_outlined,
+                      label: 'Kamar',
+                      subtitle: null,
+                      value: _rooms,
+                      onDecrement: () {
+                        if (_rooms > 1) setState(() => _rooms--);
+                      },
+                      onIncrement: () =>
+                          setState(() => _rooms = (_rooms + 1).clamp(1, 20)),
+                    ),
+                    const Divider(height: 32, color: AppColors.border),
+                    _buildStepperRow(
+                      icon: Icons.person_outline,
+                      label: 'Dewasa',
+                      subtitle: null,
+                      value: _adults,
+                      onDecrement: () {
+                        if (_adults > 1) setState(() => _adults--);
+                      },
+                      onIncrement: () =>
+                          setState(() => _adults = (_adults + 1).clamp(1, 20)),
+                    ),
+                    const Divider(height: 32, color: AppColors.border),
+                    _buildStepperRow(
+                      icon: Icons.child_care_outlined,
+                      label: 'Anak',
+                      subtitle: 'Maksimal 17 tahun',
+                      value: _children,
+                      onDecrement: () {
+                        if (_children > 0) setState(() => _children--);
+                      },
+                      onIncrement: () =>
+                          setState(() => _children = (_children + 1).clamp(0, 10)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Bottom button
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+              child: SizedBox(
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () {
+                    widget.onConfirm(_rooms, _adults, _children);
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: const Text('Terapkan',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStepperRow({
+    required IconData icon,
+    required String label,
+    required String? subtitle,
+    required int value,
+    required VoidCallback onDecrement,
+    required VoidCallback onIncrement,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: AppColors.primaryLight,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: AppColors.primary, size: 22),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: AppColors.textPrimary)),
+              if (subtitle != null) ...[
+                const SizedBox(height: 2),
+                Text(subtitle,
+                    style: const TextStyle(
+                        color: AppColors.textSecondary, fontSize: 12)),
+              ],
+            ],
+          ),
+        ),
+        // Stepper control
+        Row(
+          children: [
+            _stepBtn(Icons.remove, onDecrement, value <= (label == 'Anak' ? 0 : 1)),
+            SizedBox(
+              width: 36,
+              child: Center(
+                child: Text(
+                  '$value',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: AppColors.textPrimary),
+                ),
+              ),
+            ),
+            _stepBtn(Icons.add, onIncrement, false),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _stepBtn(IconData icon, VoidCallback onTap, bool disabled) {
+    return GestureDetector(
+      onTap: disabled ? null : onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          border: Border.all(
+              color: disabled ? AppColors.border : AppColors.primary,
+              width: 1.5),
+          shape: BoxShape.circle,
+          color: disabled ? AppColors.surface : Colors.white,
+        ),
+        child: Icon(icon,
+            size: 18,
+            color:
+                disabled ? AppColors.textSecondary : AppColors.primary),
       ),
     );
   }
