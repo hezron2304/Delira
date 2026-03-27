@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:delira/theme/app_colors.dart';
@@ -7,17 +8,43 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+
+class DetectedObject {
+  final String name;
+  final String description;
+  final double x; // Percent 0-100
+  final double y; // Percent 0-100
+
+  DetectedObject({
+    required this.name,
+    required this.description,
+    required this.x,
+    required this.y,
+  });
+
+  factory DetectedObject.fromJson(Map<String, dynamic> json) {
+    return DetectedObject(
+      name: json['name'] ?? 'Objek',
+      description: json['description'] ?? '',
+      x: (json['x'] ?? 50).toDouble(),
+      y: (json['y'] ?? 50).toDouble(),
+    );
+  }
+}
 
 class AIGuidePage extends StatefulWidget {
   final VoidCallback? onBackPressed;
-  const AIGuidePage({super.key, this.onBackPressed});
+  final VoidCallback? onHotelRequested;
+  const AIGuidePage({super.key, this.onBackPressed, this.onHotelRequested});
 
   @override
   State<AIGuidePage> createState() => _AIGuidePageState();
 }
 
 class _AIGuidePageState extends State<AIGuidePage>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   // ── Tab & mode state ────────────────────────────────────────────────────────
   int _selectedTab = 0; // 0 = Scan/AR, 1 = Chat AI
   bool _isARMode = true; // true = AR, false = Scan
@@ -29,8 +56,9 @@ class _AIGuidePageState extends State<AIGuidePage>
 
   // ── AR Gemini Vision ────────────────────────────────────────────────────────
   Timer? _arTimer;
-  String? _arLabel;
+  List<DetectedObject> _arObjects = [];
   bool _isARDetecting = false;
+  late FlutterTts _flutterTts;
 
   // ── Scan / Gemini Vision ────────────────────────────────────────────────────
   final ImagePicker _picker = ImagePicker();
@@ -51,6 +79,14 @@ class _AIGuidePageState extends State<AIGuidePage>
   bool _isTyping = false;
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+
+  late stt.SpeechToText _speechToText;
+  bool _speechEnabled = false;
+  bool _isListening = false;
+  
+  // Animation for Scanning Effect
+  late AnimationController _scanAnimController;
+  late Animation<double> _scanAnimation;
 
   final Map<String, String> _answerBank = {
     'tempat terdekat':
@@ -104,14 +140,72 @@ class _AIGuidePageState extends State<AIGuidePage>
     WidgetsBinding.instance.addObserver(this);
     
     // Initialize Gemini Models
-    _visionModel = GenerativeModel(model: 'gemini-2.5-flash', apiKey: _geminiApiKey);
-    _chatModel = GenerativeModel(model: 'gemini-2.5-flash', apiKey: _geminiApiKey);
+    _visionModel = GenerativeModel(model: 'gemini-2.0-flash-lite', apiKey: _geminiApiKey);
+    _chatModel = GenerativeModel(model: 'gemini-2.0-flash-lite', apiKey: _geminiApiKey);
 
     _messages.add({
       'role': 'bot',
       'text': 'Halo! 👋 Saya MedanBot, asisten wisata Kota Medan. Ada yang bisa saya bantu? 🗺️',
     });
+    _initTTS();
+    _initSTT();
+    _initScannerAnimation();
     _initCamera();
+  }
+
+  void _initScannerAnimation() {
+    _scanAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+    _scanAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _scanAnimController, curve: Curves.easeInOut),
+    );
+    _scanAnimController.repeat(reverse: true);
+  }
+
+  Future<void> _initSTT() async {
+    _speechToText = stt.SpeechToText();
+    try {
+      _speechEnabled = await _speechToText.initialize();
+      if (mounted) setState(() {});
+    } catch (_) {}
+  }
+
+  void _startListening() async {
+    if (!_speechEnabled) return;
+    await _speechToText.listen(
+      onResult: (result) {
+        if (mounted) {
+          setState(() {
+            _textController.text = result.recognizedWords;
+            if (result.finalResult) {
+              _isListening = false;
+            }
+          });
+        }
+      },
+      localeId: 'id-ID',
+    );
+    setState(() => _isListening = true);
+  }
+
+  void _stopListening() async {
+    await _speechToText.stop();
+    setState(() => _isListening = false);
+  }
+
+  Future<void> _initTTS() async {
+    _flutterTts = FlutterTts();
+    await _flutterTts.setLanguage("id-ID");
+    await _flutterTts.setPitch(1.0);
+    await _flutterTts.setSpeechRate(0.5);
+  }
+
+  Future<void> _speak(String text) async {
+    if (text.isEmpty) return;
+    await _flutterTts.stop();
+    await _flutterTts.speak(text);
   }
 
   void _startARDetection() {
@@ -122,7 +216,7 @@ class _AIGuidePageState extends State<AIGuidePage>
     Future.delayed(const Duration(seconds: 2), () {
       if (!mounted || !_isARMode) return;
       
-      _arTimer = Timer.periodic(const Duration(seconds: 6), (_) async {
+      _arTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
         if (!_isARMode || !_cameraReady || _cameraController == null) return;
         if (_isARDetecting || !_cameraController!.value.isInitialized) return;
       
@@ -143,21 +237,51 @@ class _AIGuidePageState extends State<AIGuidePage>
         final content = [
           Content.multi([
             DataPart('image/jpeg', bytes),
-            TextPart('Identify major objects (landmarks, buildings, nature) in this image. Give ONLY 1 to 3 words as labels, followed by emoji. Example: "Istana Maimun 🏰". Answer in Indonesian.'),
+            TextPart(
+                'Identifikasi objek utama (bangunan, fasilitas, atau benda unik). '
+                'Respon HANYA format JSON list: [{"name": "..", "description": "..", "x": 1-100, "y": 1-100}]. '
+                'PENTING: Gunakan bahasa yang sama dengan input atau bahasa yang paling sesuai untuk turis (ID/EN). '
+                'Persona: Delira (santai & bersahabat). Tanpa emoji. Maks 2 objek.'),
           ])
         ];
 
         final response = await _visionModel.generateContent(content);
-        final label = response.text;
+        final jsonText = response.text;
         
-        debugPrint('DEBUG: Terdeteksi: $label');
-        if (label != null && label.isNotEmpty && mounted) {
-          setState(() => _arLabel = label.trim());
+        debugPrint('DEBUG: Terdeteksi: $jsonText');
+        if (jsonText != null && jsonText.isNotEmpty && mounted) {
+          try {
+            // More robust JSON cleaning
+            String jsonStr = jsonText.trim();
+            final RegExp jsonRegex = RegExp(r'\[.*\]', dotAll: true);
+            final match = jsonRegex.stringMatch(jsonStr);
+            if (match == null) throw Exception('Invalid JSON format');
+            
+            final List<dynamic> list = json.decode(match);
+            final List<DetectedObject> newObjects = list.map((item) => DetectedObject.fromJson(item)).toList();
+            
+            setState(() => _arObjects = newObjects);
+
+            // Auto-read the first object if it's new
+            if (newObjects.isNotEmpty) {
+              final first = newObjects.first;
+              _speak("${first.name}. ${first.description}");
+            }
+          } catch (e) {
+            debugPrint('DEBUG: Error parsing AR JSON: $e');
+          }
         }
       } catch (e) {
         debugPrint('DEBUG: Error Deteksi AR: $e');
         if (e.toString().contains('429') || e.toString().contains('quota')) {
           _triggerCooldown();
+        } else {
+          // Show error to user via SnackBar occasionally so they aren't confused
+          if (mounted && _isARMode) {
+             ScaffoldMessenger.of(context).showSnackBar(
+               SnackBar(content: Text('Delira (AR Error): $e'), duration: const Duration(seconds: 3)),
+             );
+          }
         }
       } finally {
         _isARDetecting = false;
@@ -188,7 +312,7 @@ class _AIGuidePageState extends State<AIGuidePage>
       if (_cameras.isEmpty) return;
       final controller = CameraController(
         _cameras[0],
-        ResolutionPreset.high,
+        ResolutionPreset.medium,
         enableAudio: false,
       );
       await controller.initialize();
@@ -209,8 +333,11 @@ class _AIGuidePageState extends State<AIGuidePage>
     _stopARDetection();
     _cooldownTimer?.cancel();
     _cameraController?.dispose();
+    _flutterTts.stop();
     _textController.dispose();
     _scrollController.dispose();
+    _scanAnimController.dispose();
+    _speechToText.stop();
     super.dispose();
   }
 
@@ -272,7 +399,10 @@ class _AIGuidePageState extends State<AIGuidePage>
         Content.multi([
           DataPart('image/jpeg', bytes),
           TextPart(
-              'Kamu adalah Pemandu Wisata Digital Medan yang ahli. Identifikasi tempat ini. Jika landmark/wisata Medan, sebutkan: 1. Nama Tempat, 2. Sejarah Singkat (2-3 kalimat), 3. Tips menarik buat pengunjung. Jika bukan wisata, identifikasi saja dengan ramah. Jawab dalam Bahasa Indonesia yang seru dan penuh emoji.'),
+              'Identifikasi foto ini dengan santai dan bersahabat sebagai Delira. '
+              'Jika WISATA: Sebut Nama, Deskripsi menarik, Hotel Terdekat & Harga, Tips Navigasi. '
+              'Jika BUDAYA: Sebut Nama, Asal, Harga, Tempat Beli. '
+              'PENTING: Gunakan bahasa yang sesuai dengan konteks (ID/EN). Respon harus ramah tanpa emoji.'),
         ])
       ];
 
@@ -297,7 +427,7 @@ class _AIGuidePageState extends State<AIGuidePage>
         });
       } else {
         setState(() {
-          _scanResult = '❌ Gagal menganalisis gambar. Silakan coba lagi.';
+          _scanResult = '❌ Gagal: $e';
           _isScanLoading = false;
         });
       }
@@ -308,14 +438,21 @@ class _AIGuidePageState extends State<AIGuidePage>
     if (_isCooldown) return;
     setState(() {
       _isCooldown = true;
-      _arLabel = '⏳ AI sedang beristirahat...';
+      _arObjects = [
+        DetectedObject(
+          name: "Sistem AI Beristirahat",
+          description: "AI sedang beristirahat sejenak untuk mendinginkan mesin.",
+          x: 50,
+          y: 50
+        )
+      ];
     });
     _cooldownTimer?.cancel();
     _cooldownTimer = Timer(const Duration(seconds: 30), () {
       if (mounted) {
         setState(() {
           _isCooldown = false;
-          _arLabel = null;
+          _arObjects = [];
         });
       }
     });
@@ -374,7 +511,7 @@ class _AIGuidePageState extends State<AIGuidePage>
     }
 
     try {
-      final content = [Content.text('Kamu adalah MedanBot asisten wisata Medan. Jawab singkat dalam Bahasa Indonesia dengan emoji. Pertanyaan: $text')];
+      final content = [Content.text('Kamu adalah MedanBot asisten wisata Medan. Jawab secara informatif dalam Bahasa Indonesia. JANGAN gunakan emoji. Pertanyaan: $text')];
       final response = await _chatModel.generateContent(content);
       final botReply = response.text;
 
@@ -520,33 +657,71 @@ class _AIGuidePageState extends State<AIGuidePage>
             ),
           ),
           
-          // AR Floating Label (Automatic Object Detection)
-          if (_arLabel != null && _arLabel!.isNotEmpty)
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withAlpha(200),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white, width: 1.5),
-                    ),
-                    child: Text(
-                      _arLabel!,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+          // AR Floating Markers (Multiple Objects)
+          ..._arObjects.map((obj) {
+            final screenWidth = MediaQuery.of(context).size.width;
+            final screenHeight = MediaQuery.of(context).size.height;
+            final xPos = (obj.x / 100) * screenWidth;
+            // Limit yPos to top 60% of the screen to avoid overlapping buttons and crowding
+            final yPosRaw = (obj.y / 100) * screenHeight;
+            final yPos = yPosRaw > screenHeight * 0.60 ? screenHeight * 0.60 : yPosRaw;
+
+            return Positioned(
+              left: xPos - 80, // Offset to roughly center the marker
+              top: yPos - 60,
+              child: SizedBox(
+                width: 160, // Increased width for better text wrapping
+                child: GestureDetector(
+                  onTap: () => _speak("${obj.name}. ${obj.description}"),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withAlpha(225),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: Colors.white, width: 1.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(60),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              obj.name,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              obj.description,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                      const Icon(Icons.location_on, color: Colors.white, size: 24),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  const Icon(Icons.location_on, color: Colors.white, size: 24),
-                ],
+                ),
               ),
-            ),
+            );
+          }).toList(),
 
           // Mode badge top left
           Positioned(
@@ -555,17 +730,9 @@ class _AIGuidePageState extends State<AIGuidePage>
             child: _hudBadge(Icons.view_in_ar, 'AR MODE', Colors.greenAccent),
           ),
           
-          // Debug info or scan status
+          // High-Tech Scanning Animation
           if (_isARDetecting)
-            Positioned(
-              bottom: 180,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Text('AI sedang menganalisis...', 
-                  style: TextStyle(color: Colors.white.withAlpha(150), fontSize: 10)),
-              ),
-            ),
+            _buildScanningLaser(),
         ],
 
         // ── Scan Mode overlay: QRIS-style ──
@@ -637,7 +804,7 @@ class _AIGuidePageState extends State<AIGuidePage>
             _startARDetection();
           } else {
             _stopARDetection();
-            _arLabel = null;
+            _arObjects = [];
           }
         });
       },
@@ -696,6 +863,19 @@ class _AIGuidePageState extends State<AIGuidePage>
         children: [
           // ── Mode Toggle (AR / Scan) — bottom ──
           _buildModeToggle(),
+
+          if (_isARDetecting && _isARMode)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                'AI sedang menganalisis...',
+                style: TextStyle(
+                  color: Colors.white.withAlpha(120),
+                  fontSize: 10,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
 
           const SizedBox(height: 20),
 
@@ -758,15 +938,6 @@ class _AIGuidePageState extends State<AIGuidePage>
                 // Spacer to balance layout
                 const SizedBox(width: 80),
               ],
-            ),
-          
-          if (_isARMode)
-            const Padding(
-              padding: EdgeInsets.only(top: 10),
-              child: Text(
-                'Auto AR Detection Active 🟢',
-                style: TextStyle(color: Colors.white60, fontSize: 11, fontStyle: FontStyle.italic),
-              ),
             ),
         ],
       ),
@@ -878,6 +1049,63 @@ class _AIGuidePageState extends State<AIGuidePage>
                             height: 1.6,
                           ),
                         ),
+                        if (_scanResult != null && 
+                            (_scanResult!.toLowerCase().contains('hotel') || 
+                             _scanResult!.toLowerCase().contains('wisata') || 
+                             _scanResult!.toLowerCase().contains('landmark')))
+                          Padding(
+                            padding: const EdgeInsets.only(top: 20),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: widget.onHotelRequested,
+                                icon: const Icon(Icons.hotel_outlined, size: 18),
+                                label: const Text('Cek Hotel Terdekat'),
+                                style: OutlinedButton.styleFrom(
+                                  side: const BorderSide(color: AppColors.primary),
+                                  foregroundColor: AppColors.primary,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (_scanResult != null && 
+                            (_scanResult!.toLowerCase().contains('budaya') || 
+                             _scanResult!.toLowerCase().contains('kerajinan') || 
+                             _scanResult!.toLowerCase().contains('oleh-oleh')))
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: const Text('Dukung Pengrajin Lokal'),
+                                      content: const Text('Terima kasih! Dengan membeli produk ini, Anda turut melestarikan budaya Medan dan mendukung ekonomi pengrajin lokal. ❤️'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(context),
+                                          child: const Text('Tutup'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.favorite_border, size: 18),
+                                label: const Text('Dukung Produk Lokal'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.pinkAccent.shade100,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  elevation: 0,
+                                ),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -966,10 +1194,11 @@ class _AIGuidePageState extends State<AIGuidePage>
                         minLines: 1,
                         maxLines: 3,
                         textInputAction: TextInputAction.send,
-                        onSubmitted: _sendMessage,
+                        onSubmitted: (val) => _sendMessage(val),
                         decoration: InputDecoration(
-                          hintText: 'Tanyakan sesuatu...',
-                          hintStyle: TextStyle(color: Colors.grey[400]),
+                          hintText: _isListening ? 'Mendengarkan...' : 'Tanyakan sesuatu...',
+                          hintStyle: TextStyle(
+                              color: _isListening ? Colors.redAccent : Colors.grey[400]),
                           filled: true,
                           fillColor: const Color(0xFFF5F5F5),
                           border: OutlineInputBorder(
@@ -982,6 +1211,26 @@ class _AIGuidePageState extends State<AIGuidePage>
                         ),
                       ),
                     ),
+                    const SizedBox(width: 8),
+                    if (_speechEnabled)
+                      GestureDetector(
+                        onTap: _isListening ? _stopListening : _startListening,
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: _isListening
+                                ? Colors.redAccent.withAlpha(30)
+                                : Colors.grey[100],
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            _isListening ? Icons.mic : Icons.mic_none_rounded,
+                            color: _isListening ? Colors.redAccent : Colors.grey[600],
+                            size: 22,
+                          ),
+                        ),
+                      ),
                     const SizedBox(width: 8),
                     GestureDetector(
                       onTap: () => _sendMessage(_textController.text),
@@ -1060,6 +1309,39 @@ class _AIGuidePageState extends State<AIGuidePage>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildScanningLaser() {
+    return AnimatedBuilder(
+      animation: _scanAnimation,
+      builder: (context, child) {
+        return Positioned(
+          top: MediaQuery.of(context).size.height * 0.2 +
+              (MediaQuery.of(context).size.height * 0.4 * _scanAnimation.value),
+          left: 0,
+          right: 0,
+          child: Container(
+            height: 2,
+            decoration: BoxDecoration(
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.cyanAccent.withAlpha(150),
+                  blurRadius: 10,
+                  spreadRadius: 2,
+                ),
+              ],
+              gradient: LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  Colors.cyanAccent.withAlpha(200),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

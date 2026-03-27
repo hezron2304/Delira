@@ -155,7 +155,10 @@ class _HomePageState extends State<HomePage> {
             : _currentIndex == 2
                 ? const HotelPage()
                 : _currentIndex == 4
-                    ? AIGuidePage(onBackPressed: () => setState(() => _currentIndex = 0))
+                    ? AIGuidePage(
+                        onBackPressed: () => setState(() => _currentIndex = 0),
+                        onHotelRequested: () => setState(() => _currentIndex = 2),
+                      )
                     : _currentIndex == 1
                     ? MapPage(onHotelRequested: () {
                         setState(() {
