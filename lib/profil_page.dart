@@ -3,6 +3,7 @@ import 'package:delira/booking_history_page.dart';
 import 'package:delira/notifikasi_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:delira/login_page.dart';
+import 'package:delira/saved_hotels_page.dart';
 import 'package:delira/theme/app_colors.dart';
 
 class ProfilPage extends StatefulWidget {
@@ -14,6 +15,33 @@ class ProfilPage extends StatefulWidget {
 
 class _ProfilPageState extends State<ProfilPage> {
   bool _isSigningOut = false;
+  int _savedCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchSavedCount();
+  }
+
+  Future<void> _fetchSavedCount() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      final res = await Supabase.instance.client
+          .from('favorit')
+          .select('id')
+          .eq('user_id', user.id);
+      
+      if (mounted) {
+        setState(() {
+          _savedCount = res.length;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching saved count: $e');
+    }
+  }
 
   String get _userName {
     final meta = Supabase.instance.client.auth.currentUser?.userMetadata;
@@ -75,7 +103,17 @@ class _ProfilPageState extends State<ProfilPage> {
           _buildSectionLabel('Aktivitas'),
           const SizedBox(height: 8),
           _buildMenuItem(Icons.location_on_outlined, 'Riwayat Kunjungan'),
-          _buildMenuItem(Icons.favorite_border, 'Tempat Tersimpan'),
+          _buildMenuItem(
+            Icons.favorite_border,
+            'Tempat Tersimpan',
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SavedHotelsPage()),
+              );
+              _fetchSavedCount(); // Refresh count when coming back
+            },
+          ),
           _buildMenuItem(
             Icons.receipt_long_outlined, 
             'Riwayat Pemesanan',
@@ -221,7 +259,7 @@ class _ProfilPageState extends State<ProfilPage> {
               children: [
                 _buildStat('12', 'Dikunjungi'),
                 _buildVerticalDivider(),
-                _buildStat('5', 'Disimpan'),
+                _buildStat(_savedCount.toString(), 'Disimpan'),
                 _buildVerticalDivider(),
                 _buildStat('8', 'Scan AI'),
               ],

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:delira/hotel_detail_page.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:delira/utils/location_utils.dart';
 import 'package:delira/theme/app_colors.dart';
+import 'package:delira/widgets/hotel_card.dart';
 
 class HotelPage extends StatefulWidget {
   const HotelPage({super.key});
@@ -19,32 +21,99 @@ class _HotelPageState extends State<HotelPage> {
 
   List<Map<String, dynamic>> _hotels = [];
   bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  int _page = 0;
+  final int _pageSize = 5;
+
+  final ScrollController _scrollController = ScrollController();
   String? _errorMessage;
+  Position? _currentPosition;
 
   @override
   void initState() {
     super.initState();
     _fetchHotels();
+    _fetchLocation();
+    _scrollController.addListener(_onScroll);
   }
 
-  Future<void> _fetchHotels() async {
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 200 &&
+        !_isLoadingMore &&
+        _hasMore &&
+        !_isLoading) {
+      _fetchHotels(isLoadMore: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchLocation() async {
+    final pos = await LocationUtils.getCurrentPosition();
+    if (mounted) {
+      setState(() {
+        _currentPosition = pos;
+      });
+    }
+  }
+
+  Future<void> _fetchHotels({bool isLoadMore = false}) async {
+    if (isLoadMore) {
+      if (_isLoadingMore || !_hasMore) return;
+      setState(() => _isLoadingMore = true);
+    } else {
+      setState(() {
+        _isLoading = true;
+        _page = 0;
+        _hasMore = true;
+        _hotels = [];
+      });
+    }
+
     try {
-      final res = await Supabase.instance.client
+      final from = _page * _pageSize;
+      final to = from + _pageSize - 1;
+
+      var query = Supabase.instance.client
           .from('hotel')
           .select('*, hotel_galeri(*), kamar(*)');
+
+      // Apply Filter based on Category
+      if (_activeCategory == 'Bintang 3+') {
+        query = query.gte('rating', 3);
+      } else if (_activeCategory == 'Budget') {
+        query = query.lte('harga_termurah', 500000);
+      }
+
+      final res = await query
+          .range(from, to)
+          .order('created_at', ascending: false);
+
+      final List<Map<String, dynamic>> newData =
+          List<Map<String, dynamic>>.from(res);
+
       if (mounted) {
         setState(() {
-          _hotels = List<Map<String, dynamic>>.from(res);
+          _hotels.addAll(newData);
           _isLoading = false;
+          _isLoadingMore = false;
+          _page++;
+          _hasMore = newData.length == _pageSize;
           _errorMessage = null;
         });
       }
-    } catch (e, stackTrace) {
+    } catch (e) {
       print('FETCH ERROR: $e');
-      print('STACKTRACE: $stackTrace');
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _isLoadingMore = false;
           _errorMessage = e.toString();
         });
       }
@@ -79,6 +148,7 @@ class _HotelPageState extends State<HotelPage> {
       onTap: _onTapOutside, // Tap outside cards resets selection
       behavior: HitTestBehavior.translucent,
       child: SingleChildScrollView(
+        controller: _scrollController,
         padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -138,9 +208,12 @@ class _HotelPageState extends State<HotelPage> {
                   final isActive = category == _activeCategory;
                   return GestureDetector(
                     onTap: () {
-                      setState(() {
-                        _activeCategory = category;
-                      });
+                      if (_activeCategory != category) {
+                        setState(() {
+                          _activeCategory = category;
+                        });
+                        _fetchHotels();
+                      }
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
@@ -169,7 +242,7 @@ class _HotelPageState extends State<HotelPage> {
 
             // Grid
             if (_isLoading)
-              const Center(child: CircularProgressIndicator())
+              _buildSkeletonLoader()
             else if (_errorMessage != null)
               Center(
                 child: Padding(
@@ -209,10 +282,10 @@ class _HotelPageState extends State<HotelPage> {
                 
                 final rawPrice = (hotel['harga_termurah'] as num?)?.toInt() ?? 0;
                 
-                return _HotelCard(
+                return HotelCard(
                   name: hotel['nama'] ?? hotel['name'] ?? 'Hotel',
                   rating: (hotel['rating'] as num?)?.toDouble() ?? 0.0,
-                  distance: '${hotel['jarak_km'] ?? '0.0'} km',
+                  distance: LocationUtils.getDisplayDistance(hotel, _currentPosition),
                   price: rawPrice > 0 ? 'Rp ${_formatRupiah(rawPrice)}' : 'Hubungi Kami',
                   imageUrl: hotel['foto_utama_url'] ?? hotel['image_url'] ?? hotel['image'] ?? '',
                   isSelected: isSelected,
@@ -221,193 +294,98 @@ class _HotelPageState extends State<HotelPage> {
                 );
               },
             ),
+            if (_isLoadingMore)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
             const SizedBox(height: 80),
           ],
         ),
       ),
     );
   }
-}
 
-class _HotelCard extends StatefulWidget {
-  final String name;
-  final double rating;
-  final String distance;
-  final String price;
-  final String imageUrl;
-  final bool isSelected;
-  final Map<String, dynamic> hotelData;
-  final VoidCallback onTap;
-
-  const _HotelCard({
-    required this.name,
-    required this.rating,
-    required this.distance,
-    required this.price,
-    required this.imageUrl,
-    required this.isSelected,
-    required this.hotelData,
-    required this.onTap,
-  });
-
-  @override
-  State<_HotelCard> createState() => _HotelCardState();
-}
-
-class _HotelCardState extends State<_HotelCard> {
-  bool _isButtonActive = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final bool elevated = widget.isSelected;
-
-    return GestureDetector(
-      onTap: widget.onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-        transform: Matrix4.identity()
-          ..setTranslationRaw(0.0, elevated ? -4.0 : 0.0, 0.0),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: elevated ? AppColors.primary.withAlpha(80) : AppColors.border),
-          boxShadow: [
-            BoxShadow(
-              color: elevated
-                  ? AppColors.primary.withAlpha(40)
-                  : Colors.black.withAlpha(8),
-              blurRadius: elevated ? 20 : 8,
-              offset: Offset(0, elevated ? 8 : 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Image container
-            Expanded(
-              flex: 5,
-              child: Stack(
-                children: [
-                  ClipRRect(
+  Widget _buildSkeletonLoader() {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        childAspectRatio: 0.48,
+      ),
+      itemCount: 4,
+      itemBuilder: (context, index) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Image placeholder
+              Expanded(
+                flex: 5,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
-                    child: Image.network(
-                      widget.imageUrl,
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey.shade300,
-                          child: const Center(
-                            child: Icon(Icons.broken_image, color: Colors.grey, size: 40),
-                          ),
-                        );
-                      },
-                    ),
                   ),
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: const [
-                          BoxShadow(color: Colors.black12, blurRadius: 4),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.star, color: Colors.amber, size: 14),
-                          const SizedBox(width: 4),
-                          Text(
-                            widget.rating.toString(),
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            // Info Section
-            Expanded(
-              flex: 6,
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      widget.name,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Row(
-                      children: List.generate(
-                        5,
-                        (i) => Icon(Icons.star, color: i < ((widget.hotelData['bintang'] as num?)?.toInt() ?? 0) ? Colors.amber : Colors.grey.shade300, size: 12),
-                      ),
-                    ),
-                    Text(widget.distance, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                    const SizedBox(height: 2),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Flexible(
-                          child: Text(widget.price, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary)),
-                        ),
-                        const Text('/malam', style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    // Button: toggles green on click
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => HotelDetailPage(hotel: widget.hotelData),
-                          ),
-                        );
-                      },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: _isButtonActive ? AppColors.primary : AppColors.surface,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: _isButtonActive ? AppColors.primary : AppColors.border,
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          'Lihat Detail',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: _isButtonActive ? Colors.white : AppColors.primaryDark,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
+              // Content placeholder
+              Expanded(
+                flex: 6,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 14,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        height: 10,
+                        width: 80,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        height: 36,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
+
+

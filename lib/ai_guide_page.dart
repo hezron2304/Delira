@@ -27,7 +27,7 @@ class _AIGuidePageState extends State<AIGuidePage> {
 
   final Map<String, String> _answerBank = {
     // Tempat wisata
-    'tempat terdekat': '📍 Destinasi terdekat di Medan: Masjid Raya Al-Mashun (2.3 km), Istana Maimun (2.5 km), dan Kesawan Square (3.1 km). Semua bisa ditempuh dalam 10-15 menit! 🗺️',
+    'tempat terdekat': '📍 Beberapa destinasi terdekat di Medan antara lain: Masjid Raya Al-Mashun, Istana Maimun, dan Kesawan Square. Cek fitur "Terdekat" di halaman Beranda untuk melihat jarak akurat dari lokasimu! 🗺️',
     'masjid raya': '🕌 Masjid Raya Al-Mashun dibangun tahun 1906 oleh Sultan Ma\'mun Al-Rasyid. Arsitekturnya memadukan gaya Timur Tengah, India, dan Spanyol. Buka setiap hari dan gratis untuk dikunjungi!',
     'istana maimun': '🏰 Istana Maimun dibangun tahun 1888 oleh Sultan Deli. Merupakan simbol kejayaan Kesultanan Melayu Deli. Tiket masuk Rp 5.000, buka 08.00-17.00 WIB.',
     'kesawan': '🏛️ Kesawan Square adalah kawasan bersejarah dengan bangunan kolonial Belanda abad ke-19. Cocok untuk wisata malam dan foto-foto! Buka 24 jam dan gratis.',

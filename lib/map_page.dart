@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:delira/detail_page.dart';
+import 'package:delira/utils/location_utils.dart';
 
 class MapPage extends StatefulWidget {
   final VoidCallback? onHotelRequested;
@@ -21,11 +22,23 @@ class _MapPageState extends State<MapPage> {
   List<Marker> _markers = [];
   bool _isLoading = true;
   String _selectedCategory = 'Semua';
+  Position? _userPosition;
 
   @override
   void initState() {
     super.initState();
     _loadMarkers();
+    _fetchUserLocation();
+  }
+
+  Future<void> _fetchUserLocation() async {
+    final pos = await LocationUtils.getCurrentPosition();
+    if (mounted) {
+      setState(() {
+        _userPosition = pos;
+        // Re-build markers logic if needed, but here it's mainly for bottom sheet
+      });
+    }
   }
 
   Future<void> _loadMarkers() async {
@@ -213,6 +226,13 @@ class _MapPageState extends State<MapPage> {
                             ' ${(dest['rating'] as num?)?.toDouble() ?? 5.0}',
                             style: const TextStyle(fontSize: 12),
                           ),
+                          const SizedBox(width: 8),
+                          const Text('•', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                          const SizedBox(width: 8),
+                          Text(
+                            LocationUtils.getDisplayDistance(dest, _userPosition),
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1A6B4A)),
+                          ),
                         ],
                       ),
                     ],
@@ -234,9 +254,9 @@ class _MapPageState extends State<MapPage> {
                           if (widget.onHotelRequested != null) {
                             widget.onHotelRequested!();
                           }
-                        } else {
+                         } else {
                           dest['image_url'] = dest['foto_utama_url'] ?? dest['image_url'] ?? '';
-                          dest['jarak_km'] = '2.3';
+                          dest['jarak_km'] = LocationUtils.getDisplayDistance(dest, _userPosition).replaceAll(' km', '').replaceAll(' m', '');
                           dest['filter'] = dest['kategori'] ?? 'Wisata';
                           
                           Navigator.push(

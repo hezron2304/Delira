@@ -41,17 +41,26 @@ class _RoomSelectionPageState extends State<RoomSelectionPage> {
   List<Map<String, dynamic>> get _rooms {
     final raw = widget.hotel['kamar'];
     if (raw is List && raw.isNotEmpty) {
-      return List<Map<String, dynamic>>.from(raw).map((k) => {
-        'name': k['tipe_kamar'] ?? 'Kamar',
-        'price': 'Rp ${(k['harga_per_malam'] as num?)?.toInt().toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (m) => "${m[1]}.") ?? "0"}',
-        'rawPrice': (k['harga_per_malam'] as num?)?.toInt() ?? 0,
-        'size': k['deskripsi'] ?? '',
-        'bed': (k['fasilitas'] is List && (k['fasilitas'] as List).isNotEmpty) ? (k['fasilitas'] as List).first.toString() : 'Standard',
-        'feature': 'WiFi',
-        'left': 3,
-        'tipe_kamar': k['tipe_kamar'] ?? 'Kamar',
-        'harga_per_malam': (k['harga_per_malam'] as num?)?.toInt() ?? 0,
-        'foto_url': k['foto_url']?.toString() ?? '',  // ← field yang hilang
+      return List<Map<String, dynamic>>.from(raw).map((k) {
+        final harga = int.tryParse(k['harga_per_malam'].toString()) ?? 0;
+        final kamarId = k['id']?.toString() ?? '';
+        final hargaFormatted = harga > 0
+            ? harga.toString().replaceAllMapped(
+                RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')
+            : '0';
+        return {
+          'id': kamarId,
+          'name': k['tipe_kamar'] ?? 'Kamar',
+          'price': 'Rp $hargaFormatted',
+          'rawPrice': harga,
+          'size': k['deskripsi'] ?? '',
+          'bed': (k['fasilitas'] is List && (k['fasilitas'] as List).isNotEmpty) ? (k['fasilitas'] as List).first.toString() : 'Standard',
+          'feature': 'WiFi',
+          'left': int.tryParse(k['stok'].toString()) ?? 3,
+          'tipe_kamar': k['tipe_kamar'] ?? 'Kamar',
+          'harga_per_malam': harga,
+          'foto_url': k['foto_url']?.toString() ?? '',
+        };
       }).toList();
     }
     // Dummy fallback jika belum ada data
@@ -439,6 +448,8 @@ class _RoomSelectionPageState extends State<RoomSelectionPage> {
                               rooms: _roomsCount,
                               adults: _adultsCount,
                               children: _childrenCount,
+                              hotelId: widget.hotel['id']?.toString() ?? '',
+                              kamarId: room['id']?.toString() ?? '',
                             ),
                           ),
                         );

@@ -18,6 +18,8 @@ class CheckoutPage extends StatefulWidget {
   final int rooms;
   final int adults;
   final int children;
+  final String hotelId;
+  final String kamarId;
 
   const CheckoutPage({
     super.key,
@@ -30,6 +32,8 @@ class CheckoutPage extends StatefulWidget {
     required this.rooms,
     required this.adults,
     required this.children,
+    required this.hotelId,
+    required this.kamarId,
   });
 
   @override
@@ -123,6 +127,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
     final payload = {
       'kode_booking': orderId,
       'user_id': user.id,
+      'hotel_id': widget.hotelId,
+      'kamar_id': widget.kamarId,
       'nama_tamu': _nameController.text.trim(),
       'email_tamu': _emailController.text.trim(),
       'hp_tamu': _phoneController.text.trim(),
@@ -134,7 +140,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
       'subtotal': subtotal.toInt(),
       'diskon': _promoDiscount.toInt(),
       'total_bayar': total.toInt(),
-      'status': _selectedPayment == 'pay_at_hotel' ? 'pay_at_hotel' : 'pending',
+      'status': 'pending',
+      'metode_pembayaran': _selectedPayment,
       'catatan': _specialRequestController.text.trim(),
     };
 

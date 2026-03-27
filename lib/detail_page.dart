@@ -1,10 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:delira/theme/app_colors.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:delira/utils/location_utils.dart';
 
-class DetailPage extends StatelessWidget {
+class DetailPage extends StatefulWidget {
   final Map<String, dynamic> destinasi;
 
   const DetailPage({super.key, required this.destinasi});
+
+  @override
+  State<DetailPage> createState() => _DetailPageState();
+}
+
+class _DetailPageState extends State<DetailPage> {
+  Map<String, dynamic> get destinasi => widget.destinasi;
+  Position? _currentPosition;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLocation();
+  }
+
+  Future<void> _fetchLocation() async {
+    final pos = await LocationUtils.getCurrentPosition();
+    if (mounted) {
+      setState(() {
+        _currentPosition = pos;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -150,12 +175,12 @@ class DetailPage extends StatelessWidget {
           'Rating',
           Colors.orange,
         ),
-        _buildStatBox(
-          Icons.location_on,
-          '${destinasi['jarak_km']} km',
-          'Jarak',
-          Colors.green,
-        ),
+         _buildStatBox(
+           Icons.location_on,
+           LocationUtils.getDisplayDistance(destinasi, _currentPosition),
+           'Jarak',
+           Colors.green,
+         ),
         _buildStatBox(Icons.attach_money, 'Gratis', 'Tiket', Colors.teal),
         _buildStatBox(Icons.calendar_today, '1906', 'Tahun', Colors.grey),
       ],

@@ -35,12 +35,40 @@ class PaymentSuccessPage extends StatelessWidget {
   }
 
   String _formatDateWithTime(DateTime d, String time) {
-    const days = ['', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
-    const months = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const days = [
+      '',
+      'Senin',
+      'Selasa',
+      'Rabu',
+      'Kamis',
+      'Jumat',
+      'Sabtu',
+      'Minggu',
+    ];
+    const months = [
+      '',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agu',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des',
+    ];
     return '${days[d.weekday]}, ${d.day} ${months[d.month]} ${d.year} • $time';
   }
 
-  Widget _buildDetailRow(IconData icon, Color iconColor, String title, String value) {
+  Widget _buildDetailRow(
+    IconData icon,
+    Color iconColor,
+    String title,
+    String value,
+  ) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -50,9 +78,22 @@ class PaymentSuccessPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: GoogleFonts.inter(fontSize: 13, color: Colors.grey.shade700)),
+              Text(
+                title,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: Colors.grey.shade700,
+                ),
+              ),
               const SizedBox(height: 4),
-              Text(value, style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87)),
+              Text(
+                value,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
             ],
           ),
         ),
@@ -71,7 +112,7 @@ class PaymentSuccessPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
-                'Pembayaran Berhasil!',
+                'Booking Berhasil!',
                 style: GoogleFonts.inter(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
@@ -89,7 +130,7 @@ class PaymentSuccessPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 32),
-              
+
               // The Booking Details Card
               Container(
                 padding: const EdgeInsets.all(20),
@@ -108,16 +149,31 @@ class PaymentSuccessPage extends StatelessWidget {
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(Icons.apartment, color: Colors.orangeAccent),
+                          child: const Icon(
+                            Icons.apartment,
+                            color: Colors.orangeAccent,
+                          ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(hotelName, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+                              Text(
+                                hotelName,
+                                style: GoogleFonts.inter(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
                               const SizedBox(height: 4),
-                              Text(roomType, style: GoogleFonts.inter(color: Colors.grey.shade600, fontSize: 13)),
+                              Text(
+                                roomType,
+                                style: GoogleFonts.inter(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 13,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -126,27 +182,64 @@ class PaymentSuccessPage extends StatelessWidget {
                     const SizedBox(height: 20),
                     const Divider(color: Colors.black12),
                     const SizedBox(height: 20),
-                    
-                    _buildDetailRow(Icons.calendar_month, Colors.blue, 'Check-in:', _formatDateWithTime(checkIn, '14:00')),
+
+                    _buildDetailRow(
+                      Icons.calendar_month,
+                      Colors.blue,
+                      'Check-in:',
+                      _formatDateWithTime(checkIn, '14:00'),
+                    ),
                     const SizedBox(height: 16),
-                    _buildDetailRow(Icons.calendar_month_outlined, Colors.purple, 'Check-out:', _formatDateWithTime(checkOut, '12:00')),
+                    _buildDetailRow(
+                      Icons.calendar_month_outlined,
+                      Colors.purple,
+                      'Check-out:',
+                      _formatDateWithTime(checkOut, '12:00'),
+                    ),
                     const SizedBox(height: 16),
-                    _buildDetailRow(Icons.local_offer, Colors.amber, 'Booking ID:', orderId),
+                    _buildDetailRow(
+                      Icons.local_offer,
+                      Colors.amber,
+                      'Booking ID:',
+                      orderId,
+                    ),
                     const SizedBox(height: 16),
-                    _buildDetailRow(Icons.person, Colors.deepPurple, 'Atas nama:', guestName),
+                    _buildDetailRow(
+                      Icons.person,
+                      Colors.deepPurple,
+                      'Atas nama:',
+                      guestName,
+                    ),
                     const SizedBox(height: 16),
-                    
+
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.request_quote, color: Colors.orange, size: 20),
+                        const Icon(
+                          Icons.request_quote,
+                          color: Colors.orange,
+                          size: 20,
+                        ),
                         const SizedBox(width: 12),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Total Dibayar:', style: GoogleFonts.inter(fontSize: 13, color: Colors.grey.shade700)),
+                            Text(
+                              'Total Dibayar:',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
                             const SizedBox(height: 4),
-                            Text('Rp ${_formatRupiah(totalAmount)}', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
+                            Text(
+                              'Rp ${_formatRupiah(totalAmount)}',
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primaryDark,
+                              ),
+                            ),
                           ],
                         ),
                       ],
@@ -155,7 +248,7 @@ class PaymentSuccessPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 32),
-              
+
               // Real QR Code Generator
               Container(
                 width: 110,
@@ -164,7 +257,11 @@ class PaymentSuccessPage extends StatelessWidget {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, spreadRadius: 2),
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                    ),
                   ],
                 ),
                 child: Center(
@@ -177,10 +274,16 @@ class PaymentSuccessPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              Text('QR Code untuk check-in digital', style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade500)),
-              
+              Text(
+                'QR Code untuk check-in digital',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: Colors.grey.shade500,
+                ),
+              ),
+
               const SizedBox(height: 48),
-              
+
               // Buttons
               OutlinedButton.icon(
                 onPressed: () {
@@ -200,11 +303,19 @@ class PaymentSuccessPage extends StatelessWidget {
                   );
                 },
                 icon: const Icon(Icons.receipt_long, color: AppColors.primary),
-                label: Text('Lihat E-Tiket', style: GoogleFonts.inter(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                label: Text(
+                  'Lihat E-Tiket',
+                  style: GoogleFonts.inter(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 54),
                   side: const BorderSide(color: AppColors.primary, width: 1.5),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
               const SizedBox(height: 12),
@@ -217,17 +328,31 @@ class PaymentSuccessPage extends StatelessWidget {
                   );
                 },
                 icon: const Icon(Icons.home, color: Colors.white),
-                label: Text('Kembali ke Beranda', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold)),
+                label: Text(
+                  'Kembali ke Beranda',
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryDark,
                   minimumSize: const Size(double.infinity, 54),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   elevation: 0,
                 ),
               ),
-              
+
               const SizedBox(height: 24),
-              Text('Konfirmasi dikirim ke $email', style: GoogleFonts.inter(fontSize: 12, color: Colors.grey.shade500)),
+              Text(
+                'Konfirmasi dikirim ke $email',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: Colors.grey.shade500,
+                ),
+              ),
             ],
           ),
         ),

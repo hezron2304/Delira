@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:delira/utils/location_utils.dart';
 import 'package:delira/detail_page.dart';
 import 'package:delira/profil_page.dart';
 import 'package:delira/hotel_page.dart';
@@ -24,12 +26,23 @@ class _HomePageState extends State<HomePage> {
   List<Map<String, dynamic>> _destinasiList = [];
   String _userName = 'Pengguna';
   String _userInitials = 'P';
+  Position? _currentPosition;
 
   @override
   void initState() {
     super.initState();
     _fetchUserData();
     _fetchDestinasi();
+    _fetchLocation();
+  }
+
+  Future<void> _fetchLocation() async {
+    final pos = await LocationUtils.getCurrentPosition();
+    if (mounted) {
+      setState(() {
+        _currentPosition = pos;
+      });
+    }
   }
 
   Future<void> _fetchUserData() async {
@@ -388,7 +401,7 @@ class _HomePageState extends State<HomePage> {
           final String name = item['nama'] ?? 'Nav';
           final String badge = item['badge'] ?? 'Wisata';
           final num rating = item['rating'] ?? 0.0;
-          final String dist = '${item['jarak_km'] ?? '0.0'} km';
+          final String dist = LocationUtils.getDisplayDistance(item, _currentPosition);
           final String imageUrl = item['image_url'] ?? '';
 
           return SizedBox(
@@ -514,7 +527,7 @@ class _HomePageState extends State<HomePage> {
           final String name = item['nama'] ?? 'Nav';
           final String kategori = item['kategori'] ?? 'Wisata'; // Use literal category text naturally
           final num rating = item['rating'] ?? 0.0;
-          final String dist = '${item['jarak_km'] ?? '0.0'} km';
+          final String dist = LocationUtils.getDisplayDistance(item, _currentPosition);
 
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
