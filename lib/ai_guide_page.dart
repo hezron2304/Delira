@@ -161,13 +161,19 @@ class _AIGuidePageState extends State<AIGuidePage> {
           'session_id': DateTime.now().millisecondsSinceEpoch.toString(),
         });
       } else {
-        throw Exception('API error: ${response.body}');
+        throw Exception('API error: ${response.statusCode}');
       }
     } catch (e) {
-      // MedanBot fallback triggered: $e
-      // Step 3: Default fallback answer
       if (!mounted) return;
-      const fallbackReply = '🤔 Maaf, saya belum punya informasi tentang itu. Coba tanyakan tentang destinasi wisata, kuliner, hotel, atau transportasi di Medan ya! 😊';
+      final errorMsg = e.toString().toLowerCase();
+      String fallbackReply = '🤔 Terjadi kesalahan, coba lagi';
+      
+      if (errorMsg.contains('socket') || errorMsg.contains('network') || errorMsg.contains('timeout')) {
+        fallbackReply = 'Periksa koneksi internet kamu';
+      } else {
+        fallbackReply = '🤔 Maaf, saya belum punya informasi tentang itu. Coba tanyakan tentang destinasi wisata, kuliner, hotel, atau transportasi di Medan ya! 😊';
+      }
+      
       setState(() {
         _messages.add({
           'role': 'bot',

@@ -1,10 +1,20 @@
-Analyzing delira...
+Analyzing delira...                                             
 
-  error - lib\login_page.dart:62:28 - The class 'GoogleSignIn' doesn't have an unnamed constructor. Try using one of the named constructors defined in 'GoogleSignIn'. - new_with_undefined_constructor_default
-  error - lib\login_page.dart:63:45 - The method 'signIn' isn't defined for the type 'GoogleSignIn'. Try correcting the name to the name of an existing method, or defining a method named 'signIn'. - undefined_method
-warning - lib\login_page.dart:3:62 - The library 'package:supabase_flutter/supabase_flutter.dart' doesn't export a member with the hidden name 'GoogleSignIn'. Try removing the name from the list of hidden members. - undefined_hidden_name
-   info - lib\home_page.dart:205:31 - Unnecessary use of multiple underscores. Try using '_'. - unnecessary_underscores
-   info - lib\home_page.dart:261:31 - Unnecessary use of multiple underscores. Try using '_'. - unnecessary_underscores
-   info - lib\home_page.dart:333:31 - Unnecessary use of multiple underscores. Try using '_'. - unnecessary_underscores
+   info - The imported package 'supabase' isn't a dependency of the importing package - insert_sql.dart:1:8 - depend_on_referenced_packages
+   info - Don't invoke 'print' in production code - insert_sql.dart:63:5 - avoid_print
+   info - Don't invoke 'print' in production code - insert_sql.dart:65:5 - avoid_print
+   info - Don't invoke 'print' in production code - insert_sql.dart:67:5 - avoid_print
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\checkout_page.dart:219:32 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\checkout_page.dart:221:21 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\checkout_page.dart:241:40 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\checkout_page.dart:248:38 - use_build_context_synchronously
+   info - 'groupValue' is deprecated and shouldn't be used. Use a RadioGroup ancestor to manage group value instead. This feature was deprecated after v3.32.0-0.0.pre - lib\checkout_page.dart:572:17 - deprecated_member_use
+   info - 'onChanged' is deprecated and shouldn't be used. Use RadioGroup to handle value change instead. This feature was deprecated after v3.32.0-0.0.pre - lib\checkout_page.dart:573:17 - deprecated_member_use
+   info - Unnecessary use of 'toList' in a spread - lib\checkout_page.dart:579:14 - unnecessary_to_list_in_spreads
+   info - The private field _isButtonActive could be 'final' - lib\hotel_page.dart:233:8 - prefer_final_fields
+   info - Don't invoke 'print' in production code - lib\map_page.dart:37:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\map_page.dart:44:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\map_page.dart:45:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\map_page.dart:65:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\map_page.dart:66:7 - avoid_print
 
-6 issues found.

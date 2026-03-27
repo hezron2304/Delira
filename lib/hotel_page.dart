@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:delira/hotel_detail_page.dart';
 import 'package:delira/theme/app_colors.dart';
 
@@ -16,50 +17,46 @@ class _HotelPageState extends State<HotelPage> {
   // Track which card is selected (-1 = none)
   int _selectedCardIndex = -1;
 
-  final List<Map<String, dynamic>> _hotels = [
-    {
-      'name': 'Grand Mercure Medan Angkasa',
-      'rating': 4.8,
-      'distance': '0.5 km',
-      'price': 'Rp 850.000',
-      'image': 'https://images.unsplash.com/photo-1564501049412-61c2a3083791?auto=format&fit=crop&q=80',
-    },
-    {
-      'name': 'Hotel Aryaduta Medan',
-      'rating': 4.6,
-      'distance': '1.1 km',
-      'price': 'Rp 520.000',
-      'image': 'https://images.unsplash.com/photo-1590490360182-c33d72085a08?auto=format&fit=crop&q=80',
-    },
-    {
-      'name': 'Hotel Dharma Deli',
-      'rating': 4.3,
-      'distance': '1.2 km',
-      'price': 'Rp 400.000',
-      'image': 'https://images.unsplash.com/photo-1618773928121-c32242e63f39?auto=format&fit=crop&q=80',
-    },
-    {
-      'name': 'Novotel Medan',
-      'rating': 4.5,
-      'distance': '0.8 km',
-      'price': 'Rp 750.000',
-      'image': 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80',
-    },
-    {
-      'name': 'JW Marriott Medan',
-      'rating': 4.9,
-      'distance': '1.5 km',
-      'price': 'Rp 1.200.000',
-      'image': 'https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&q=80',
-    },
-    {
-      'name': 'Santika Premiere Dyandra',
-      'rating': 4.4,
-      'distance': '2.0 km',
-      'price': 'Rp 480.000',
-      'image': 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?auto=format&fit=crop&q=80',
-    },
-  ];
+  List<Map<String, dynamic>> _hotels = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchHotels();
+  }
+
+  Future<void> _fetchHotels() async {
+    try {
+      final res = await Supabase.instance.client
+          .from('hotel')
+          .select('*, hotel_galeri(*), kamar(*)');
+      if (mounted) {
+        setState(() {
+          _hotels = List<Map<String, dynamic>>.from(res);
+          _isLoading = false;
+          _errorMessage = null;
+        });
+      }
+    } catch (e, stackTrace) {
+      print('FETCH ERROR: $e');
+      print('STACKTRACE: $stackTrace');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e.toString();
+        });
+      }
+    }
+  }
+
+  String _formatRupiah(int amount) {
+    return amount.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]}.',
+    );
+  }
 
   void _onCardTap(int index) {
     setState(() {
@@ -171,7 +168,32 @@ class _HotelPageState extends State<HotelPage> {
             const SizedBox(height: 24),
 
             // Grid
-            GridView.builder(
+            if (_isLoading)
+              const Center(child: CircularProgressIndicator())
+            else if (_errorMessage != null)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Error: $_errorMessage',
+                        style: const TextStyle(color: Colors.red, fontSize: 13),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton(
+                        onPressed: _fetchHotels,
+                        child: const Text('Coba Lagi'),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              GridView.builder(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 crossAxisSpacing: 16,
@@ -184,12 +206,15 @@ class _HotelPageState extends State<HotelPage> {
               itemBuilder: (context, index) {
                 final hotel = _hotels[index];
                 final isSelected = _selectedCardIndex == index;
+                
+                final rawPrice = (hotel['harga_termurah'] as num?)?.toInt() ?? 0;
+                
                 return _HotelCard(
-                  name: hotel['name'] as String,
-                  rating: hotel['rating'] as double,
-                  distance: hotel['distance'] as String,
-                  price: hotel['price'] as String,
-                  imageUrl: hotel['image'] as String,
+                  name: hotel['nama'] ?? hotel['name'] ?? 'Hotel',
+                  rating: (hotel['rating'] as num?)?.toDouble() ?? 0.0,
+                  distance: '${hotel['jarak_km'] ?? '0.0'} km',
+                  price: rawPrice > 0 ? 'Rp ${_formatRupiah(rawPrice)}' : 'Hubungi Kami',
+                  imageUrl: hotel['foto_utama_url'] ?? hotel['image_url'] ?? hotel['image'] ?? '',
                   isSelected: isSelected,
                   hotelData: hotel,
                   onTap: () => _onCardTap(index),
@@ -265,14 +290,21 @@ class _HotelCardState extends State<_HotelCard> {
               flex: 5,
               child: Stack(
                 children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
-                      image: DecorationImage(
-                        image: NetworkImage(widget.imageUrl),
-                        fit: BoxFit.cover,
-                      ),
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                    child: Image.network(
+                      widget.imageUrl,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey.shade300,
+                          child: const Center(
+                            child: Icon(Icons.broken_image, color: Colors.grey, size: 40),
+                          ),
+                        );
+                      },
                     ),
                   ),
                   Positioned(
@@ -322,7 +354,7 @@ class _HotelCardState extends State<_HotelCard> {
                     Row(
                       children: List.generate(
                         5,
-                        (i) => Icon(Icons.star, color: i < widget.rating.floor() ? Colors.amber : Colors.grey.shade300, size: 12),
+                        (i) => Icon(Icons.star, color: i < ((widget.hotelData['bintang'] as num?)?.toInt() ?? 0) ? Colors.amber : Colors.grey.shade300, size: 12),
                       ),
                     ),
                     Text(widget.distance, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),

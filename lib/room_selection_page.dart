@@ -4,8 +4,13 @@ import 'package:delira/checkout_page.dart';
 
 class RoomSelectionPage extends StatefulWidget {
   final Map<String, dynamic> hotel;
+  final Map<String, dynamic>? selectedKamar;
 
-  const RoomSelectionPage({super.key, required this.hotel});
+  const RoomSelectionPage({
+    super.key,
+    required this.hotel,
+    this.selectedKamar,
+  });
 
   @override
   State<RoomSelectionPage> createState() => _RoomSelectionPageState();
@@ -32,25 +37,29 @@ class _RoomSelectionPageState extends State<RoomSelectionPage> {
   String get _guestSummary =>
       '$_roomsCount Kamar, $_adultsCount Dewasa, $_childrenCount Anak';
 
-  // ----- Room Data -----
-  final List<Map<String, dynamic>> _rooms = [
-    {
-      'name': 'Deluxe Double',
-      'price': 'Rp 850.000',
-      'size': '28 m²',
-      'bed': 'King Bed',
-      'feature': 'Bathtub',
-      'left': 3,
-    },
-    {
-      'name': 'Superior Twin',
-      'price': 'Rp 720.000',
-      'size': '24 m²',
-      'bed': 'Twin Bed',
-      'feature': 'Shower',
-      'left': 0,
-    },
-  ];
+  // ----- Room Data (from Supabase kamar join or dummy fallback) -----
+  List<Map<String, dynamic>> get _rooms {
+    final raw = widget.hotel['kamar'];
+    if (raw is List && raw.isNotEmpty) {
+      return List<Map<String, dynamic>>.from(raw).map((k) => {
+        'name': k['tipe_kamar'] ?? 'Kamar',
+        'price': 'Rp ${(k['harga_per_malam'] as num?)?.toInt().toString().replaceAllMapped(RegExp(r"(\d{1,3})(?=(\d{3})+(?!\d))"), (m) => "${m[1]}.") ?? "0"}',
+        'rawPrice': (k['harga_per_malam'] as num?)?.toInt() ?? 0,
+        'size': k['deskripsi'] ?? '',
+        'bed': (k['fasilitas'] is List && (k['fasilitas'] as List).isNotEmpty) ? (k['fasilitas'] as List).first.toString() : 'Standard',
+        'feature': 'WiFi',
+        'left': 3,
+        'tipe_kamar': k['tipe_kamar'] ?? 'Kamar',
+        'harga_per_malam': (k['harga_per_malam'] as num?)?.toInt() ?? 0,
+        'foto_url': k['foto_url']?.toString() ?? '',  // ← field yang hilang
+      }).toList();
+    }
+    // Dummy fallback jika belum ada data
+    return [
+      {'name': 'Deluxe Double', 'price': 'Rp 850.000', 'rawPrice': 850000, 'size': '28 m²', 'bed': 'King Bed', 'feature': 'Bathtub', 'left': 3},
+      {'name': 'Superior Twin', 'price': 'Rp 720.000', 'rawPrice': 720000, 'size': '24 m²', 'bed': 'Twin Bed', 'feature': 'Shower', 'left': 0},
+    ];
+  }
 
   // ================================================================
   //  DATE PICKER DIALOG
@@ -119,7 +128,7 @@ class _RoomSelectionPageState extends State<RoomSelectionPage> {
                   fontSize: 20),
             ),
             Text(
-              widget.hotel['name'] ?? 'Hotel',
+              widget.hotel['nama'] ?? widget.hotel['name'] ?? 'Hotel',
               style: const TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 13,
@@ -303,19 +312,36 @@ class _RoomSelectionPageState extends State<RoomSelectionPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            height: 120,
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              color: AppColors.surface,
-              borderRadius:
-                  BorderRadius.vertical(top: Radius.circular(19)),
-            ),
-            child: const Center(
-              child: Icon(Icons.hotel,
-                  color: AppColors.primary, size: 48),
-            ),
-          ),
+          () {
+            final fotoUrl = room['foto_url']?.toString() ?? '';
+            return ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(19)),
+              child: fotoUrl.isNotEmpty
+                  ? Image.network(
+                      fotoUrl,
+                      height: 120,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        height: 120,
+                        color: AppColors.surface,
+                        child: const Center(
+                          child: Icon(Icons.hotel,
+                              color: AppColors.primary, size: 48),
+                        ),
+                      ),
+                    )
+                  : Container(
+                      height: 120,
+                      color: AppColors.surface,
+                      child: const Center(
+                        child: Icon(Icons.hotel,
+                            color: AppColors.primary, size: 48),
+                      ),
+                    ),
+            );
+          }(),
           Padding(
             padding: const EdgeInsets.all(20.0),
             child: Column(
@@ -395,19 +421,18 @@ class _RoomSelectionPageState extends State<RoomSelectionPage> {
                     const SizedBox(width: 8),
                     ElevatedButton(
                       onPressed: () {
-                        // Parse price from String "Rp 850.000" to int 850000
-                        final rawPrice = room['price'] as String;
-                        final parsedPrice = int.tryParse(
-                          rawPrice.replaceAll(RegExp(r'[^0-9]'), '')
-                        ) ?? 0;
+                        final rawPrice = (room['rawPrice'] as int?) ?? (() {
+                          final s = room['price'] as String? ?? '';
+                          return int.tryParse(s.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+                        })();
 
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => CheckoutPage(
-                              hotelName: widget.hotel['name'] ?? 'Hotel',
-                              roomType: room['name'],
-                              roomPrice: parsedPrice,
+                              hotelName: widget.hotel['nama'] ?? widget.hotel['name'] ?? 'Hotel',
+                              roomType: room['tipe_kamar'] ?? room['name'] ?? 'Kamar',
+                              roomPrice: rawPrice,
                               checkIn: _checkIn,
                               checkOut: _checkOut,
                               nights: _nightCount,

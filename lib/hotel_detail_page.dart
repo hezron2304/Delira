@@ -1,11 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:delira/room_selection_page.dart';
 import 'package:delira/theme/app_colors.dart';
 
-class HotelDetailPage extends StatelessWidget {
+class HotelDetailPage extends StatefulWidget {
   final Map<String, dynamic> hotel;
 
   const HotelDetailPage({super.key, required this.hotel});
+
+  @override
+  State<HotelDetailPage> createState() => _HotelDetailPageState();
+}
+
+class _HotelDetailPageState extends State<HotelDetailPage> {
+  Map<String, dynamic> get hotel => widget.hotel;
+  List<Map<String, dynamic>> _galeriList = [];
+
+  @override
+  void initState() {
+    super.initState();
+    // Baca langsung dari nested join 'hotel_galeri' yang sudah ada di payload hotel
+    final raw = hotel['hotel_galeri'];
+    if (raw is List) {
+      _galeriList = List<Map<String, dynamic>>.from(raw);
+      // Sort berdasarkan urutan secara ascending (sisi Dart)
+      _galeriList.sort((a, b) =>
+          ((a['urutan'] as num?) ?? 0).compareTo((b['urutan'] as num?) ?? 0));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +58,7 @@ class HotelDetailPage extends StatelessWidget {
                       _buildInformationSection(),
                       const SizedBox(height: 32),
                       _buildLocationSection(),
-                      const SizedBox(height: 120), // Space for bottom booking bar
+                      const SizedBox(height: 120),
                     ],
                   ),
                 ),
@@ -52,14 +74,20 @@ class HotelDetailPage extends StatelessWidget {
   Widget _buildImageHeader(BuildContext context) {
     return Stack(
       children: [
-        Container(
+        SizedBox(
           height: 350,
           width: double.infinity,
-          decoration: BoxDecoration(
-            image: DecorationImage(
-              image: NetworkImage(hotel['image'] ?? ''),
-              fit: BoxFit.cover,
-            ),
+          child: Image.network(
+            hotel['foto_utama_url'] ?? hotel['image_url'] ?? hotel['image'] ?? '',
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                color: Colors.grey.shade300,
+                child: const Center(
+                  child: Icon(Icons.broken_image, color: Colors.grey, size: 64),
+                ),
+              );
+            },
           ),
         ),
         SafeArea(
@@ -79,7 +107,24 @@ class HotelDetailPage extends StatelessWidget {
                   backgroundColor: Colors.white,
                   child: IconButton(
                     icon: const Icon(Icons.share_outlined, color: AppColors.textPrimary),
-                    onPressed: () {},
+                    onPressed: () {
+                      final harga = (hotel['harga_termurah'] as num?)?.toInt() ?? 0;
+                      final formattedPrice = harga > 0
+                          ? harga.toString().replaceAllMapped(
+                              RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')
+                          : '0';
+                      final bintang = (hotel['bintang'] as num?)?.toInt() ?? 0;
+                      final namaHotel = hotel['nama']?.toString() ?? hotel['name']?.toString() ?? 'Hotel';
+                      final slug = hotel['slug']?.toString() ?? '';
+                      final shareText = 'Cek penginapan keren ini di Delira!\n\n'
+                          '🏢 $namaHotel\n'
+                          '⭐ Bintang $bintang\n'
+                          '💸 Mulai dari Rp $formattedPrice / malam\n\n'
+                          'Lihat detail selengkapnya di sini:\n'
+                          'https://delira.app/hotel/$slug\n\n'
+                          'Ayo liburan ke Medan dan booking sekarang di aplikasi Delira!';
+                      Share.share(shareText);
+                    },
                   ),
                 ),
               ],
@@ -92,7 +137,7 @@ class HotelDetailPage extends StatelessWidget {
 
   Widget _buildTitleSection() {
     return Text(
-      hotel['name'] ?? '',
+      hotel['nama'] ?? hotel['name'] ?? '',
       style: const TextStyle(
         fontSize: 26,
         fontWeight: FontWeight.bold,
@@ -103,10 +148,15 @@ class HotelDetailPage extends StatelessWidget {
   }
 
   Widget _buildRatingRow() {
+    final bintang = (hotel['bintang'] as num?)?.toInt() ?? 0;
     return Row(
       children: List.generate(
         5,
-        (index) => const Icon(Icons.star, color: Colors.amber, size: 24),
+        (index) => Icon(
+          Icons.star,
+          size: 24,
+          color: index < bintang ? Colors.amber : Colors.grey.shade300,
+        ),
       ),
     );
   }
@@ -115,11 +165,17 @@ class HotelDetailPage extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _buildStatBox(Icons.star, hotel['rating'].toString(), 'Rating', Colors.orange),
-        _buildStatBox(Icons.location_on, hotel['distance'] ?? '0.5 km', 'Jarak', Colors.green),
-        _buildStatBox(Icons.payments_outlined, (hotel['price'] ?? 'Rp 850rb').toString().replaceAll('.000', 'rb'), 'Mulai dari', Colors.teal),
+        _buildStatBox(Icons.star, (hotel['rating'] as num?)?.toDouble().toString() ?? '5.0', 'Rating', Colors.orange),
+        _buildStatBox(Icons.location_on, '${hotel['jarak_km'] ?? hotel['distance'] ?? '0.5'} km', 'Jarak', Colors.green),
+        _buildStatBox(Icons.payments_outlined, _formatHarga(hotel['harga_termurah']), 'Mulai dari', Colors.teal),
       ],
     );
+  }
+
+  String _formatHarga(dynamic val) {
+    final n = (val as num?)?.toInt() ?? 0;
+    if (n == 0) return 'Hubungi';
+    return 'Rp ${n.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
   }
 
   Widget _buildStatBox(IconData icon, String value, String label, Color iconColor) {
@@ -154,29 +210,44 @@ class HotelDetailPage extends StatelessWidget {
       children: [
         const Text('Galeri Foto', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
-        SizedBox(
-          height: 100,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: 4,
-            separatorBuilder: (context, index) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              return Container(
-                width: 140,
-                decoration: BoxDecoration(
+        if (_galeriList.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              'Tidak ada foto galeri.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
+          )
+        else
+          SizedBox(
+            height: 100,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _galeriList.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final fotoUrl = _galeriList[index]['foto_url']?.toString() ?? '';
+                return ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  image: DecorationImage(
-                    image: NetworkImage(hotel['image'] ?? ''),
+                  child: Image.network(
+                    fotoUrl,
+                    width: 140,
+                    height: 100,
                     fit: BoxFit.cover,
+                    errorBuilder: (context, error, stack) => Container(
+                      width: 140,
+                      color: Colors.grey.shade300,
+                      child: const Icon(Icons.broken_image, color: Colors.grey),
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
-        ),
       ],
     );
   }
+
 
   Widget _buildFacilitiesSection() {
     return Column(
@@ -347,7 +418,7 @@ class HotelDetailPage extends StatelessWidget {
                     text: TextSpan(
                       children: [
                         TextSpan(
-                          text: hotel['price'] ?? 'Rp 850.000',
+                          text: _formatHarga(hotel['harga_termurah']),
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,

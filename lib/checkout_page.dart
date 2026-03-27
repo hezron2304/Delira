@@ -1,10 +1,12 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:delira/theme/app_colors.dart';
+import 'package:delira/login_page.dart';
+import 'package:delira/payment_success_page.dart';
+import 'package:delira/payment_webview_page.dart';
 
 class CheckoutPage extends StatefulWidget {
   final String hotelName;
@@ -71,14 +73,31 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  String _formatDate(DateTime d) {
+
+  String _formatDateWithDay(DateTime d) {
+    const days = ['', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
     const months = [
       '', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
     ];
-    return '${d.day} ${months[d.month]} ${d.year}';
+    return '${days[d.weekday]}, ${d.day} ${months[d.month]} ${d.year}';
   }
 
   Future<void> _handlePayment() async {
+    final session = Supabase.instance.client.auth.currentSession;
+    final user = Supabase.instance.client.auth.currentUser;
+
+    if (session == null || session.isExpired || user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sesi telah habis, silakan masuk kembali.')),
+      );
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+        (route) => false,
+      );
+      return;
+    }
+
     // 1. Validate form
     if (_nameController.text.trim().isEmpty ||
         _phoneController.text.trim().isEmpty ||
@@ -101,33 +120,51 @@ class _CheckoutPageState extends State<CheckoutPage> {
     final total = subtotal + tax + serviceFee - _promoDiscount;
 
     // 4. Save booking to Supabase
+    final payload = {
+      'kode_booking': orderId,
+      'user_id': user.id,
+      'nama_tamu': _nameController.text.trim(),
+      'email_tamu': _emailController.text.trim(),
+      'hp_tamu': _phoneController.text.trim(),
+      'check_in': widget.checkIn.toIso8601String().split('T')[0],
+      'check_out': widget.checkOut.toIso8601String().split('T')[0],
+      'jumlah_malam': widget.nights.toInt(),
+      'jumlah_tamu': (widget.adults + widget.children).toInt(),
+      'harga_per_malam': widget.roomPrice.toInt(),
+      'subtotal': subtotal.toInt(),
+      'diskon': _promoDiscount.toInt(),
+      'total_bayar': total.toInt(),
+      'status': _selectedPayment == 'pay_at_hotel' ? 'pay_at_hotel' : 'pending',
+      'catatan': _specialRequestController.text.trim(),
+    };
+
+    print("--- [DEEP TRACE: PAYLOAD AUDIT] ---");
+    print("Payload: ${jsonEncode(payload)}");
+    print("Session JWT valid? ${session.accessToken.isNotEmpty}");
+    print("Role: ${user.role}");
+
     try {
-      await Supabase.instance.client.from('bookings').insert({
-        'order_id': orderId,
-        'user_id': Supabase.instance.client.auth.currentUser?.id,
-        'hotel_name': widget.hotelName,
-        'room_type': widget.roomType,
-        'check_in': widget.checkIn.toIso8601String(),
-        'check_out': widget.checkOut.toIso8601String(),
-        'nights': widget.nights,
-        'rooms': widget.rooms,
-        'adults': widget.adults,
-        'children': widget.children,
-        'guest_name': _nameController.text.trim(),
-        'guest_phone': _phoneController.text.trim(),
-        'guest_email': _emailController.text.trim(),
-        'payment_method': _selectedPayment,
-        'total_amount': total,
-        'status': _selectedPayment == 'pay_at_hotel' ? 'pay_at_hotel' : 'pending',
-        'special_request': _specialRequestController.text.trim(),
-        'promo_code': _appliedPromo.isEmpty ? null : _appliedPromo,
-      });
+      await Supabase.instance.client.schema('public').from('booking').insert(payload);
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal menyimpan pesanan: $e')),
-      );
+
+      print("--- [DEEP TRACE: ERROR HANDLING] ---");
+      if (e is PostgrestException) {
+        print("PostgrestException Code: ${e.code}");
+        print("PostgrestException Message: ${e.message}");
+        print("PostgrestException Details: ${e.details}");
+        print("PostgrestException Hint: ${e.hint}");
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('DB Error [${e.code}]: ${e.message}')),
+        );
+      } else {
+        print("Unknown Exception: $e");
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
       return;
     }
 
@@ -136,131 +173,49 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
     // 5. Handle payment method
     if (_selectedPayment == 'pay_at_hotel') {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => AlertDialog(
-          title: const Text('Pesanan Berhasil!'),
-          content: Text(
-            'Pesanan Anda di ${widget.hotelName} telah dikonfirmasi.\n'
-            'Pembayaran dilakukan saat check-in.\n\n'
-            'ID Pesanan: $orderId'
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PaymentSuccessPage(
+            hotelName: widget.hotelName,
+            roomType: widget.roomType,
+            checkIn: widget.checkIn,
+            checkOut: widget.checkOut,
+            orderId: orderId,
+            guestName: _nameController.text.trim(),
+            totalAmount: total,
+            email: _emailController.text.trim(),
           ),
-          actions: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-              onPressed: () {
-                Navigator.of(context).popUntil((route) => route.isFirst);
-              },
-              child: const Text('Kembali ke Beranda', style: TextStyle(color: Colors.white)),
-            ),
-          ],
         ),
+        (route) => route.isFirst,
       );
       return;
     }
 
     // 6. Online payments (Pakasir)
-    const pakasirSlug = 'delira'; 
-    const pakasirApiKey = 'CyedHODmAomCy1xy2f49rbQPJdEDFw54'; 
-
-    final paymentUrl = 'https://app.pakasir.com/pay/$pakasirSlug/$total?order_id=$orderId';
-
-    try {
-      final uri = Uri.parse(paymentUrl);
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Gagal membuka halaman pembayaran')),
-      );
-      return;
-    }
+    final paymentUrl = 'https://app.pakasir.com/pay/delira/$total?order_id=$orderId';
 
     if (!mounted) return;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => _buildPaymentStatusDialog(orderId, total, pakasirSlug, pakasirApiKey),
-    );
-  }
 
-  Widget _buildPaymentStatusDialog(String orderId, int total, String slug, String apiKey) {
-    bool isChecking = false;
-    return StatefulBuilder(
-      builder: (context, setDialogState) => AlertDialog(
-        title: const Text('Selesaikan Pembayaran'),
-        content: const Text(
-          'Selesaikan pembayaran di halaman Pakasir, '
-          'lalu tekan tombol di bawah setelah selesai.',
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PaymentWebViewPage(
+          paymentUrl: paymentUrl,
+          orderId: orderId,
+          hotelName: widget.hotelName,
+          roomType: widget.roomType,
+          checkIn: widget.checkIn,
+          checkOut: widget.checkOut,
+          guestName: _nameController.text.trim(),
+          totalAmount: total,
+          email: _emailController.text.trim(),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Nanti', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-            onPressed: isChecking ? null : () async {
-              setDialogState(() => isChecking = true);
-              try {
-                final response = await http.get(Uri.parse(
-                  'https://app.pakasir.com/api/transactiondetail'
-                  '?project=$slug&amount=$total&order_id=$orderId&api_key=$apiKey'
-                ));
-                final data = jsonDecode(response.body);
-                if (data['status'] == 'completed') {
-                  await Supabase.instance.client
-                      .from('bookings')
-                      .update({'status': 'paid'})
-                      .eq('order_id', orderId);
-                  
-                  if (!mounted) return;
-                  Navigator.of(context).pop(); // Close processing dialog
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (_) => AlertDialog(
-                      title: const Text('Pembayaran Berhasil! 🎉'),
-                      content: Text('ID Pesanan: $orderId\nTerima kasih telah memesan di Delira!'),
-                      actions: [
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-                          onPressed: () {
-                            Navigator.of(context).popUntil((route) => route.isFirst);
-                          },
-                          child: const Text('Kembali ke Beranda',
-                              style: TextStyle(color: Colors.white)),
-                        ),
-                      ],
-                    ),
-                  );
-                } else {
-                  setDialogState(() => isChecking = false);
-                  if (!mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Pembayaran belum selesai. Coba lagi.')),
-                  );
-                }
-              } catch (e) {
-                setDialogState(() => isChecking = false);
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Gagal mengecek status pembayaran')),
-                );
-              }
-            },
-            child: isChecking
-                ? const SizedBox(
-                    width: 20, height: 20,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                : const Text('Cek Status Pembayaran',
-                    style: TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
     );
   }
+
+
 
   void _applyPromo() {
     FocusScope.of(context).unfocus();
@@ -353,9 +308,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   elevation: 0,
                 ),
                 child: _isLoading
-                    ? const SizedBox(
-                        width: 20, height: 20,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                     : Text(
                         'Bayar Sekarang →',
                         style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold),
@@ -397,7 +350,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
             ],
           ),
           const SizedBox(height: 16),
-          _buildInfoRow('Check-in • Check-out', '${_formatDate(widget.checkIn)} - ${_formatDate(widget.checkOut)}'),
+          _buildInfoRow('Check-in', _formatDateWithDay(widget.checkIn)),
+          const SizedBox(height: 6),
+          _buildInfoRow('Check-out', _formatDateWithDay(widget.checkOut)),
           const SizedBox(height: 8),
           _buildInfoRow('Jumlah malam', '${widget.nights} malam'),
           const SizedBox(height: 8),
@@ -533,12 +488,20 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   Widget _buildSection5() {
     final options = [
-      {'val': 'transfer_bank', 'title': 'Transfer Bank', 'sub': 'BCA, Mandiri, BNI', 'ic': Icons.account_balance, 'c': AppColors.primary},
-      {'val': 'qris', 'title': 'QRIS', 'sub': 'Scan QR Code', 'ic': Icons.qr_code, 'c': AppColors.primary},
-      {'val': 'gopay', 'title': 'GoPay', 'sub': 'E-Wallet', 'ic': Icons.account_balance_wallet, 'c': Colors.green},
-      {'val': 'ovo', 'title': 'OVO', 'sub': 'E-Wallet', 'ic': Icons.account_balance_wallet, 'c': Colors.purple},
-      {'val': 'kartu_kredit', 'title': 'Kartu Kredit/Debit', 'sub': 'Visa, Mastercard', 'ic': Icons.credit_card, 'c': Colors.blue},
-      {'val': 'pay_at_hotel', 'title': 'Bayar di Hotel', 'sub': 'Cash/Card', 'ic': Icons.store, 'c': Colors.orange},
+      {
+        'val': 'bayar_online',
+        'title': 'Bayar Online',
+        'sub': 'QRIS, Virtual Account, dan E-Wallet (via Pakasir)',
+        'ic': Icons.payment,
+        'c': AppColors.primary,
+      },
+      {
+        'val': 'pay_at_hotel',
+        'title': 'Bayar di Hotel',
+        'sub': 'Bayar tunai atau kartu saat check-in',
+        'ic': Icons.store_mall_directory,
+        'c': Colors.orange,
+      },
     ];
 
     return Container(
@@ -563,7 +526,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
               decoration: BoxDecoration(
                 color: isSelected ? AppColors.primary.withAlpha(12) : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: isSelected ? AppColors.primary : Colors.transparent),
+                border: Border.all(color: isSelected ? AppColors.primary : Colors.grey.withAlpha(60)),
               ),
               child: RadioListTile<String>(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12),

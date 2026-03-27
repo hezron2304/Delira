@@ -17,6 +17,7 @@ class MapPage extends StatefulWidget {
 class _MapPageState extends State<MapPage> {
   final MapController _mapController = MapController();
   List<Map<String, dynamic>> _allDestinasi = [];
+  List<Map<String, dynamic>> _allHotels = [];
   List<Marker> _markers = [];
   bool _isLoading = true;
   String _selectedCategory = 'Semua';
@@ -32,51 +33,31 @@ class _MapPageState extends State<MapPage> {
     try {
       final supabase = Supabase.instance.client;
 
-      // Check if user session exists
-      final session = supabase.auth.currentSession;
-      print('Session: $session');
-
       final response = await supabase
           .from('destinasi')
-          .select('id, nama, kategori, deskripsi, latitude, longitude, rating, foto_utama_url')
+          .select('id, nama, kategori, deskripsi, latitude, longitude, rating, foto_utama_url, image_url')
           .eq('is_active', true);
 
-      print('Response: $response');
-      print('Count: ${response.length}');
+      final hotelResponse = await supabase.from('hotel').select();
 
-      if (response.isEmpty) {
-        setState(() => _isLoading = false);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Belum ada destinasi tersedia')));
-        }
-        return;
-      }
-
-      final List<Map<String, dynamic>> data =
+      final List<Map<String, dynamic>> datadestinasi =
           List<Map<String, dynamic>>.from(response);
+      final List<Map<String, dynamic>> datahotel =
+          List<Map<String, dynamic>>.from(hotelResponse);
 
       setState(() {
-        _allDestinasi = data;
-        _buildMarkers(data);
+        _allDestinasi = datadestinasi;
+        _allHotels = datahotel;
+        _buildMarkers(datadestinasi, datahotel);
         _isLoading = false;
       });
-    } catch (e, stackTrace) {
-      print('Error loading markers: $e');
-      print('Stack trace: $stackTrace');
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          duration: const Duration(seconds: 5),
-          backgroundColor: Colors.red,
-        ));
-      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _buildMarkers(List<Map<String, dynamic>> data) {
-    _markers = data.map((dest) {
+  void _buildMarkers(List<Map<String, dynamic>> destData, List<Map<String, dynamic>> hotelData) {
+    final destMarkers = destData.map((dest) {
       return Marker(
         point: LatLng(
             (dest['latitude'] as num?)?.toDouble() ?? 0.0,
@@ -84,7 +65,7 @@ class _MapPageState extends State<MapPage> {
         width: 40,
         height: 40,
         child: GestureDetector(
-          onTap: () => _showBottomSheet(dest),
+          onTap: () => _showBottomSheet(dest, false),
           child: Container(
             decoration: BoxDecoration(
               color: const Color(0xFF1A6B4A),
@@ -97,6 +78,30 @@ class _MapPageState extends State<MapPage> {
         ),
       );
     }).toList();
+
+    final hotelMarkers = hotelData.map((h) {
+      return Marker(
+        point: LatLng(
+            (h['latitude'] as num?)?.toDouble() ?? 0.0,
+            (h['longitude'] as num?)?.toDouble() ?? 0.0),
+        width: 40,
+        height: 40,
+        child: GestureDetector(
+          onTap: () => _showBottomSheet(h, true),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.orange,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+            ),
+            child: const Icon(Icons.hotel, color: Colors.white, size: 20),
+          ),
+        ),
+      );
+    }).toList();
+
+    _markers = [...destMarkers, ...hotelMarkers];
   }
 
   Future<void> _openNavigation(double lat, double lng, String nama) async {
@@ -125,16 +130,16 @@ class _MapPageState extends State<MapPage> {
   void _filterByCategory(String category) {
     setState(() => _selectedCategory = category);
     if (category == 'Semua') {
-      _buildMarkers(_allDestinasi);
+      _buildMarkers(_allDestinasi, _allHotels);
     } else {
       final filtered = _allDestinasi
           .where((d) => d['kategori'] == category)
           .toList();
-      _buildMarkers(filtered);
+      _buildMarkers(filtered, _allHotels);
     }
   }
 
-  void _showBottomSheet(Map<String, dynamic> dest) {
+  void _showBottomSheet(Map<String, dynamic> dest, bool isHotel) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -157,9 +162,9 @@ class _MapPageState extends State<MapPage> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: dest['foto_utama_url'] != null
+                  child: (dest['foto_utama_url'] != null || dest['image_url'] != null)
                       ? Image.network(
-                          dest['foto_utama_url'],
+                          dest['image_url'] ?? dest['foto_utama_url'] ?? '',
                           width: 80,
                           height: 80,
                           fit: BoxFit.cover,
@@ -167,14 +172,14 @@ class _MapPageState extends State<MapPage> {
                             width: 80,
                             height: 80,
                             color: const Color(0xFFE8F5EE),
-                            child: const Icon(Icons.place, color: Color(0xFF1A6B4A), size: 40),
+                            child: Icon(isHotel ? Icons.hotel : Icons.place, color: isHotel ? Colors.orange : const Color(0xFF1A6B4A), size: 40),
                           ),
                         )
                       : Container(
                           width: 80,
                           height: 80,
                           color: const Color(0xFFE8F5EE),
-                          child: const Icon(Icons.place, color: Color(0xFF1A6B4A), size: 40),
+                          child: Icon(isHotel ? Icons.hotel : Icons.place, color: isHotel ? Colors.orange : const Color(0xFF1A6B4A), size: 40),
                         ),
                 ),
                 const SizedBox(width: 12),
@@ -183,7 +188,7 @@ class _MapPageState extends State<MapPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        dest['nama'] ?? '',
+                        dest['nama'] ?? dest['name'] ?? '',
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -198,14 +203,14 @@ class _MapPageState extends State<MapPage> {
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
-                              dest['kategori'] ?? '',
+                              dest['kategori'] ?? (isHotel ? 'Hotel' : 'Wisata'),
                               style: const TextStyle(fontSize: 11, color: Color(0xFF1A6B4A)),
                             ),
                           ),
                           const SizedBox(width: 8),
                           const Icon(Icons.star, color: Colors.amber, size: 14),
                           Text(
-                            ' ${dest['rating'] ?? 0}',
+                            ' ${(dest['rating'] as num?)?.toDouble() ?? 5.0}',
                             style: const TextStyle(fontSize: 12),
                           ),
                         ],
@@ -224,19 +229,23 @@ class _MapPageState extends State<MapPage> {
                     height: 48,
                     child: OutlinedButton(
                       onPressed: () {
-                        // Pass adapted destinasi map to old DetailPage format
-                        // Using empty string for image since it's not present here
-                        dest['image_url'] = dest['foto_utama_url'] ?? '';
-                        dest['jarak_km'] = '2.3';
-                        dest['filter'] = dest['kategori'];
-                        
                         Navigator.pop(context); // close sheet
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => DetailPage(destinasi: dest),
-                          ),
-                        );
+                        if (isHotel) {
+                          if (widget.onHotelRequested != null) {
+                            widget.onHotelRequested!();
+                          }
+                        } else {
+                          dest['image_url'] = dest['foto_utama_url'] ?? dest['image_url'] ?? '';
+                          dest['jarak_km'] = '2.3';
+                          dest['filter'] = dest['kategori'] ?? 'Wisata';
+                          
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => DetailPage(destinasi: dest),
+                            ),
+                          );
+                        }
                       },
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: Color(0xFF1A6B4A)),
@@ -262,9 +271,9 @@ class _MapPageState extends State<MapPage> {
                       onPressed: () {
                         Navigator.pop(context); // tutup bottom sheet
                         _openNavigation(
-                          (dest['latitude'] as num).toDouble(),
-                          (dest['longitude'] as num).toDouble(),
-                          dest['nama'] ?? '',
+                          (dest['latitude'] as num?)?.toDouble() ?? 0.0,
+                          (dest['longitude'] as num?)?.toDouble() ?? 0.0,
+                          dest['nama'] ?? dest['name'] ?? '',
                         );
                       },
                       icon: const Icon(Icons.explore, size: 16, color: Colors.white),

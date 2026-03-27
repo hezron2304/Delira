@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:delira/booking_history_page.dart';
 import 'package:delira/notifikasi_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:delira/login_page.dart';
@@ -75,7 +76,16 @@ class _ProfilPageState extends State<ProfilPage> {
           const SizedBox(height: 8),
           _buildMenuItem(Icons.location_on_outlined, 'Riwayat Kunjungan'),
           _buildMenuItem(Icons.favorite_border, 'Tempat Tersimpan'),
-          _buildMenuItem(Icons.groups_outlined, 'Riwayat Pemesanan'),
+          _buildMenuItem(
+            Icons.receipt_long_outlined, 
+            'Riwayat Pemesanan',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const BookingHistoryPage()),
+              );
+            },
+          ),
           _buildMenuItem(Icons.document_scanner_outlined, 'Riwayat Scan AI'),
 
           const SizedBox(height: 16),

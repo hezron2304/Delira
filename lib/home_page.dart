@@ -61,79 +61,24 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _fetchDestinasi() async {
-    // Dummy Data for UI presentation
-    if (mounted) {
-      setState(() {
-        _destinasiList = [
-          {
-            'kategori': 'Situs Sejarah',
-            'badge': 'Religi',
-            'filter': 'Religi',
-            'nama': 'Masjid Raya Al-Mashun',
-            'rating': 4.8,
-            'jarak_km': 2.3,
-            'is_featured': true,
-            'image_url': 'https://images.unsplash.com/photo-1565552643983-6df3d12ebd83?auto=format&fit=crop&q=80',
-            'icon': Icons.mosque,
-          },
-          {
-            'kategori': 'Sejarah',
-            'badge': 'Sejarah',
-            'filter': 'Sejarah',
-            'nama': 'Istana Maimun',
-            'rating': 4.7,
-            'jarak_km': 1.8,
-            'is_featured': true,
-            'image_url': 'https://images.unsplash.com/photo-1582539097950-7164998273f3?auto=format&fit=crop&q=80',
-            'icon': Icons.account_balance,
-          },
-          {
-            'kategori': 'Religi',
-            'badge': 'Religi',
-            'filter': 'Religi',
-            'nama': 'Gereja Immanuel',
-            'rating': 4.6,
-            'jarak_km': 3.1,
-            'is_featured': false,
-            'image_url': '',
-            'icon': Icons.church,
-          },
-          {
-            'kategori': 'Kuliner',
-            'badge': 'Kuliner',
-            'filter': 'Kuliner',
-            'nama': 'Soto Kesawan',
-            'rating': 4.9,
-            'jarak_km': 0.8,
-            'is_featured': true,
-            'image_url': 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&q=80',
-            'icon': Icons.ramen_dining,
-          },
-          {
-            'kategori': 'Situs Sejarah',
-            'badge': 'Cagar Budaya',
-            'filter': 'Sejarah',
-            'nama': 'Mansion Tjong A Fie',
-            'rating': 4.8,
-            'jarak_km': 1.1,
-            'is_featured': true,
-            'image_url': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/14/Tjong_A_Fie_Mansion_%286071477708%29.jpg/1200px-Tjong_A_Fie_Mansion_%286071477708%29.jpg',
-            'icon': Icons.storefront,
-          },
-          {
-            'kategori': 'Taman Rekreasi',
-            'badge': 'Taman',
-            'filter': 'Rekreasi',
-            'nama': 'Taman Hutan Cemara',
-            'rating': 4.5,
-            'jarak_km': 6.3,
-            'is_featured': true,
-            'image_url': 'https://images.unsplash.com/photo-1444459092404-b6e15d2a9311?auto=format&fit=crop&q=80',
-            'icon': Icons.park,
-          },
-        ];
-        _isLoading = false;
-      });
+    try {
+      final res = await Supabase.instance.client.from('destinasi').select();
+      if (mounted) {
+        setState(() {
+          _destinasiList = List<Map<String, dynamic>>.from(res).map((d) {
+            d['badge'] = d['kategori'] ?? 'Wisata';
+            d['filter'] = d['kategori'] ?? 'Semua';
+            d['icon'] = Icons.place;
+            d['is_featured'] = d['is_featured'] ?? false;
+            return d;
+          }).toList();
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

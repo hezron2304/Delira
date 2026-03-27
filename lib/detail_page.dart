@@ -50,7 +50,7 @@ class DetailPage extends StatelessWidget {
     return Stack(
       children: [
         Image.network(
-          destinasi['image_url'] ?? '',
+          destinasi['image_url'] ?? destinasi['foto_utama_url'] ?? '',
           height: 300,
           width: double.infinity,
           fit: BoxFit.cover,
@@ -307,7 +307,7 @@ class DetailPage extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   image: DecorationImage(
-                    image: NetworkImage(destinasi['image_url'] ?? ''),
+                    image: NetworkImage(destinasi['image_url'] ?? destinasi['foto_utama_url'] ?? ''),
                     fit: BoxFit.cover,
                   ),
                 ),

@@ -70,21 +70,31 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _isLoading = true);
     try {
       await GoogleSignIn.instance.initialize(
-        clientId:
+        serverClientId:
             '319610939712-4t97beqneupotsbec6hek4afu9v8e38n.apps.googleusercontent.com',
       );
       
-      GoogleSignInAccount? googleUser;
+      GoogleSignInAccount googleUser;
       try {
         googleUser = await GoogleSignIn.instance.authenticate(
           scopeHint: ['email', 'profile'],
         );
-      } on GoogleSignInException catch (_) {
-        if (mounted) setState(() => _isLoading = false);
+      } catch (error) {
+        final errorString = error.toString().toLowerCase();
+        if (errorString.contains('canceled') || errorString.contains('cancelled')) {
+          if (mounted) setState(() => _isLoading = false);
+          return;
+        }
+        print("Google Sign In Error: $error");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error Google Sign In: $error')),
+          );
+        }
         return;
       }
 
-      final googleAuth = googleUser.authentication;
+      final googleAuth = await googleUser.authentication;
       if (googleAuth.idToken == null) {
         throw const AuthException('Tidak ada ID Token dari Google');
       }
@@ -114,11 +124,24 @@ class _LoginPageState extends State<LoginPage> {
           SnackBar(content: Text('Gagal masuk Google: ${error.message}')),
         );
       }
+    } on Exception catch (error) {
+      if (mounted) {
+        final errorMsg = error.toString().toLowerCase();
+        if (errorMsg.contains('network') || errorMsg.contains('socket')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Periksa koneksi internet kamu')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Terjadi kesalahan, coba lagi')),
+          );
+        }
+      }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Terjadi kesalahan: $error')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Terjadi kesalahan, coba lagi')),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -323,21 +346,29 @@ class _LoginPageState extends State<LoginPage> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SvgPicture.asset('assets/google_logo.svg', height: 24),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'Lanjutkan dengan Google',
-                      style: TextStyle(
-                        color: Colors.black87,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SvgPicture.asset('assets/google_logo.svg', height: 24),
+                          const SizedBox(width: 12),
+                          const Text(
+                            'Lanjutkan dengan Google',
+                            style: TextStyle(
+                              color: Colors.black87,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
               ),
 
               const SizedBox(height: 48),
