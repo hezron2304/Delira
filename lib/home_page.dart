@@ -6,10 +6,11 @@ import 'package:delira/detail_page.dart';
 import 'package:delira/profil_page.dart';
 import 'package:delira/hotel_page.dart';
 import 'package:delira/map_page.dart';
-import 'package:delira/notifikasi_page.dart';
 import 'package:delira/ai_guide_page.dart';
 import 'package:delira/theme/app_colors.dart';
 import 'package:delira/models/destinasi.dart';
+import 'package:delira/search_page.dart';
+import 'package:shimmer/shimmer.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -178,76 +179,52 @@ class _HomePageState extends State<HomePage> {
       child: Column(
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: Colors.white24,
-                    child: Text(_userInitials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Selamat datang 👋', style: TextStyle(color: Colors.white.withAlpha(200), fontSize: 13)),
-                      Text(_userName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                    ],
-                  ),
-                ],
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: Colors.white24,
+                child: Text(_userInitials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               ),
-              Stack(
-                clipBehavior: Clip.none,
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const NotifikasiPage()),
-                      );
-                    },
-                    child: const Icon(Icons.notifications_outlined, color: Colors.white, size: 28),
-                  ),
-                  Positioned(
-                    right: -2,
-                    top: -2,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Text(
-                        '3',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          height: 1,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
+                  Text('Selamat datang 👋', style: TextStyle(color: Colors.white.withAlpha(200), fontSize: 13)),
+                  Text(_userName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                 ],
               ),
             ],
           ),
           const SizedBox(height: 24),
-          TextField(
-            decoration: InputDecoration(
-              hintText: 'Cari destinasi wisata...',
-              hintStyle: TextStyle(color: Colors.grey.shade500),
-              prefixIcon: const Icon(Icons.search, color: Colors.grey),
-              suffixIcon: const Icon(Icons.tune, color: Colors.grey),
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
+          Container(
+            height: 50,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(40),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: TextField(
+              readOnly: true,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SearchPage()),
+                );
+              },
+              style: const TextStyle(fontSize: 15, color: AppColors.textPrimary),
+              decoration: const InputDecoration(
+                hintText: 'Cari destinasi wisata...',
+                hintStyle: TextStyle(color: AppColors.textTertiary, fontSize: 14),
+                prefixIcon: Icon(Icons.search, color: AppColors.primary, size: 22),
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.only(top: 14, bottom: 14, right: 16),
               ),
-              contentPadding: const EdgeInsets.symmetric(vertical: 14),
             ),
           ),
         ],
@@ -320,11 +297,15 @@ class _HomePageState extends State<HomePage> {
         itemCount: 3,
         separatorBuilder: (context, index) => const SizedBox(width: 16),
         itemBuilder: (context, index) {
-          return Container(
-            width: 160,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(16),
+          return Shimmer.fromColors(
+            baseColor: Colors.grey.shade300,
+            highlightColor: Colors.grey.shade100,
+            child: Container(
+              width: 160,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+              ),
             ),
           );
         },
@@ -506,7 +487,29 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildTerdekatList() {
-    final items = _filteredDestinasi;
+    final items = List<Destinasi>.from(_filteredDestinasi);
+
+    if (_currentPosition != null) {
+      try {
+        items.sort((a, b) {
+          final distA = Geolocator.distanceBetween(
+            _currentPosition!.latitude, 
+            _currentPosition!.longitude, 
+            a.latitude, 
+            a.longitude
+          );
+          final distB = Geolocator.distanceBetween(
+            _currentPosition!.latitude, 
+            _currentPosition!.longitude, 
+            b.latitude, 
+            b.longitude
+          );
+          return distA.compareTo(distB);
+        });
+      } catch (e) {
+        debugPrint('Error sorting Destinasi by distance: $e');
+      }
+    }
     
     if (items.isEmpty) {
       return const Padding(

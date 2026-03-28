@@ -1,4 +1,5 @@
-import 'package:supabase/supabase.dart';
+import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
   final supabaseUrl = 'https://pdhvqcbnsncxkfspasjq.supabase.co';
@@ -60,10 +61,10 @@ void main() async {
   ];
   
   try {
-    print('Menjalankan Insert ke Supabase...');
+    debugPrint('Menjalankan Insert ke Supabase...');
     await client.from('destinasi').insert(data);
-    print('Destinasi berhasil ditambahkan!');
+    debugPrint('Destinasi berhasil ditambahkan!');
   } catch (e) {
-    print('Gagal: $e');
+    debugPrint('Gagal: $e');
   }
 }

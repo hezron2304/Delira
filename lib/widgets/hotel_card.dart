@@ -11,6 +11,8 @@ class HotelCard extends StatefulWidget {
   final String imageUrl;
   final bool isSelected;
   final Map<String, dynamic> hotelData;
+  final String? destName;
+  final String? destDistance;
   final VoidCallback onTap;
 
   const HotelCard({
@@ -22,6 +24,8 @@ class HotelCard extends StatefulWidget {
     required this.imageUrl,
     required this.isSelected,
     required this.hotelData,
+    this.destName,
+    this.destDistance,
     required this.onTap,
   });
 
@@ -159,13 +163,25 @@ class _HotelCardState extends State<HotelCard> {
                         ),
                       ),
                     ),
-                    Text(
-                      widget.distance,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
+                    if (widget.destName != null && widget.destDistance != null)
+                      Text(
+                        'Hanya ${widget.destDistance} dari ${widget.destName}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      )
+                    else
+                      Text(
+                        widget.distance,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
                       ),
-                    ),
                     const SizedBox(height: 2),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.end,

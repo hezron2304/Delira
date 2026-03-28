@@ -6,6 +6,7 @@ import 'package:delira/models/destinasi.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:delira/hotel_page.dart';
 
 class DetailPage extends StatefulWidget {
   final Destinasi destinasi;
@@ -880,7 +881,25 @@ class _DetailPageState extends State<DetailPage> {
               height: 52,
               child: OutlinedButton.icon(
                 onPressed: () {
-                  Navigator.pop(context, 'GO_TO_HOTEL');
+                  if (destinasi.latitude != 0 && destinasi.longitude != 0) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => HotelPage(
+                          destLat: destinasi.latitude,
+                          destLng: destinasi.longitude,
+                          destName: destinasi.nama,
+                        ),
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Lokasi Destinasi tidak valid'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
                 },
                 icon: const Icon(
                   Icons.hotel_outlined,
