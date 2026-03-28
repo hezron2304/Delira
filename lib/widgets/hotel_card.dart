@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:delira/hotel_detail_page.dart';
 import 'package:delira/theme/app_colors.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class HotelCard extends StatefulWidget {
   final String name;
@@ -69,23 +70,24 @@ class _HotelCardState extends State<HotelCard> {
                   ClipRRect(
                     borderRadius:
                         const BorderRadius.vertical(top: Radius.circular(15)),
-                    child: Image.network(
-                      widget.imageUrl,
+                    child: CachedNetworkImage(
+                      imageUrl: widget.imageUrl,
                       fit: BoxFit.cover,
                       width: double.infinity,
                       height: double.infinity,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey.shade300,
-                          child: const Center(
-                            child: Icon(
-                              Icons.broken_image,
-                              color: Colors.grey,
-                              size: 40,
-                            ),
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey.shade200,
+                      ),
+                      errorWidget: (context, url, error) => Container(
+                        color: Colors.grey.shade300,
+                        child: const Center(
+                          child: Icon(
+                            Icons.broken_image,
+                            color: Colors.grey,
+                            size: 40,
                           ),
-                        );
-                      },
+                        ),
+                      ),
                     ),
                   ),
                   Positioned(

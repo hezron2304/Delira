@@ -121,7 +121,7 @@ class _SavedHotelsPageState extends State<SavedHotelsPage> {
                       isSelected: false,
                       hotelData: hotel,
                       onTap: () {
-                        // Navigasi detail sudah ada di dalam HotelCard
+                        // Navigasi detail sudah dihandle otomatis oleh HotelCard
                       },
                     );
                   },

@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:delira/detail_page.dart';
 import 'package:delira/utils/location_utils.dart';
+import 'package:delira/models/destinasi.dart';
 
 class MapPage extends StatefulWidget {
   final VoidCallback? onHotelRequested;
@@ -17,7 +18,7 @@ class MapPage extends StatefulWidget {
 
 class _MapPageState extends State<MapPage> {
   final MapController _mapController = MapController();
-  List<Map<String, dynamic>> _allDestinasi = [];
+  List<Destinasi> _allDestinasi = [];
   List<Map<String, dynamic>> _allHotels = [];
   List<Marker> _markers = [];
   bool _isLoading = true;
@@ -53,10 +54,9 @@ class _MapPageState extends State<MapPage> {
 
       final hotelResponse = await supabase.from('hotel').select();
 
-      final List<Map<String, dynamic>> datadestinasi =
-          List<Map<String, dynamic>>.from(response);
-      final List<Map<String, dynamic>> datahotel =
-          List<Map<String, dynamic>>.from(hotelResponse);
+      final List<Map<String, dynamic>> rawDestinasi = List<Map<String, dynamic>>.from(response);
+      final List<Destinasi> datadestinasi = rawDestinasi.map((d) => Destinasi.fromMap(d)).toList();
+      final List<Map<String, dynamic>> datahotel = List<Map<String, dynamic>>.from(hotelResponse);
 
       setState(() {
         _allDestinasi = datadestinasi;
@@ -69,16 +69,14 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
-  void _buildMarkers(List<Map<String, dynamic>> destData, List<Map<String, dynamic>> hotelData) {
+  void _buildMarkers(List<Destinasi> destData, List<Map<String, dynamic>> hotelData) {
     final destMarkers = destData.map((dest) {
       return Marker(
-        point: LatLng(
-            (dest['latitude'] as num?)?.toDouble() ?? 0.0,
-            (dest['longitude'] as num?)?.toDouble() ?? 0.0),
+        point: LatLng(dest.latitude, dest.longitude),
         width: 40,
         height: 40,
         child: GestureDetector(
-          onTap: () => _showBottomSheet(dest, false),
+          onTap: () => _showBottomSheetDestinasi(dest),
           child: Container(
             decoration: BoxDecoration(
               color: const Color(0xFF1A6B4A),
@@ -146,13 +144,13 @@ class _MapPageState extends State<MapPage> {
       _buildMarkers(_allDestinasi, _allHotels);
     } else {
       final filtered = _allDestinasi
-          .where((d) => d['kategori'] == category)
+          .where((d) => d.kategori == category)
           .toList();
       _buildMarkers(filtered, _allHotels);
     }
   }
 
-  void _showBottomSheet(Map<String, dynamic> dest, bool isHotel) {
+  void _showBottomSheetDestinasi(Destinasi dest) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -175,25 +173,18 @@ class _MapPageState extends State<MapPage> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: (dest['foto_utama_url'] != null || dest['image_url'] != null)
-                      ? Image.network(
-                          dest['image_url'] ?? dest['foto_utama_url'] ?? '',
-                          width: 80,
-                          height: 80,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stack) => Container(
-                            width: 80,
-                            height: 80,
-                            color: const Color(0xFFE8F5EE),
-                            child: Icon(isHotel ? Icons.hotel : Icons.place, color: isHotel ? Colors.orange : const Color(0xFF1A6B4A), size: 40),
-                          ),
-                        )
-                      : Container(
-                          width: 80,
-                          height: 80,
-                          color: const Color(0xFFE8F5EE),
-                          child: Icon(isHotel ? Icons.hotel : Icons.place, color: isHotel ? Colors.orange : const Color(0xFF1A6B4A), size: 40),
-                        ),
+                  child: Image.network(
+                    dest.fullImageUrl,
+                    width: 80,
+                    height: 80,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stack) => Container(
+                      width: 80,
+                      height: 80,
+                      color: const Color(0xFFE8F5EE),
+                      child: const Icon(Icons.place, color: Color(0xFF1A6B4A), size: 40),
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -201,7 +192,7 @@ class _MapPageState extends State<MapPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        dest['nama'] ?? dest['name'] ?? '',
+                        dest.nama,
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -216,21 +207,21 @@ class _MapPageState extends State<MapPage> {
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
-                              dest['kategori'] ?? (isHotel ? 'Hotel' : 'Wisata'),
+                              dest.kategori,
                               style: const TextStyle(fontSize: 11, color: Color(0xFF1A6B4A)),
                             ),
                           ),
                           const SizedBox(width: 8),
                           const Icon(Icons.star, color: Colors.amber, size: 14),
                           Text(
-                            ' ${(dest['rating'] as num?)?.toDouble() ?? 5.0}',
+                            ' ${dest.rating}',
                             style: const TextStyle(fontSize: 12),
                           ),
                           const SizedBox(width: 8),
                           const Text('•', style: TextStyle(color: Colors.grey, fontSize: 12)),
                           const SizedBox(width: 8),
                           Text(
-                            LocationUtils.getDisplayDistance(dest, _userPosition),
+                            LocationUtils.getDisplayDistance(dest.toMap(), _userPosition),
                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1A6B4A)),
                           ),
                         ],
@@ -250,22 +241,12 @@ class _MapPageState extends State<MapPage> {
                     child: OutlinedButton(
                       onPressed: () {
                         Navigator.pop(context); // close sheet
-                        if (isHotel) {
-                          if (widget.onHotelRequested != null) {
-                            widget.onHotelRequested!();
-                          }
-                         } else {
-                          dest['image_url'] = dest['foto_utama_url'] ?? dest['image_url'] ?? '';
-                          dest['jarak_km'] = LocationUtils.getDisplayDistance(dest, _userPosition).replaceAll(' km', '').replaceAll(' m', '');
-                          dest['filter'] = dest['kategori'] ?? 'Wisata';
-                          
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => DetailPage(destinasi: dest),
-                            ),
-                          );
-                        }
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => DetailPage(destinasi: dest),
+                          ),
+                        );
                       },
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: Color(0xFF1A6B4A)),
@@ -291,9 +272,9 @@ class _MapPageState extends State<MapPage> {
                       onPressed: () {
                         Navigator.pop(context); // tutup bottom sheet
                         _openNavigation(
-                          (dest['latitude'] as num?)?.toDouble() ?? 0.0,
-                          (dest['longitude'] as num?)?.toDouble() ?? 0.0,
-                          dest['nama'] ?? dest['name'] ?? '',
+                          dest.latitude,
+                          dest.longitude,
+                          dest.nama,
                         );
                       },
                       icon: const Icon(Icons.explore, size: 16, color: Colors.white),
@@ -319,6 +300,163 @@ class _MapPageState extends State<MapPage> {
         ),
       ),
     );
+  }
+
+  void _showBottomSheetHotel(Map<String, dynamic> h) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    h['image_url'] ?? '',
+                    width: 80,
+                    height: 80,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stack) => Container(
+                      width: 80,
+                      height: 80,
+                      color: const Color(0xFFE8F5EE),
+                      child: const Icon(Icons.hotel, color: Colors.orange, size: 40),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        h['nama'] ?? h['name'] ?? '',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF3E0),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: const Text(
+                              'Hotel',
+                              style: TextStyle(fontSize: 11, color: Colors.orange),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Icon(Icons.star, color: Colors.amber, size: 14),
+                          Text(
+                            ' ${(h['rating'] as num?)?.toDouble() ?? 5.0}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text('•', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                          const SizedBox(width: 8),
+                          Text(
+                            LocationUtils.getDisplayDistance(h, _userPosition),
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.orange),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  flex: 1,
+                  child: SizedBox(
+                    height: 48,
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.pop(context); // close sheet
+                        if (widget.onHotelRequested != null) {
+                          widget.onHotelRequested!();
+                        }
+                      },
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.orange),
+                        foregroundColor: Colors.orange,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Lihat Hotel',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 1,
+                  child: SizedBox(
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context); // tutup bottom sheet
+                        _openNavigation(
+                          (h['latitude'] as num?)?.toDouble() ?? 0.0,
+                          (h['longitude'] as num?)?.toDouble() ?? 0.0,
+                          h['nama'] ?? h['name'] ?? '',
+                        );
+                      },
+                      icon: const Icon(Icons.explore, size: 16, color: Colors.white),
+                      label: const Text(
+                        'Navigasi',
+                        style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+                        maxLines: 1,
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showBottomSheet(dynamic dest, bool isHotel) {
+    if (isHotel) {
+       _showBottomSheetHotel(dest as Map<String, dynamic>);
+    } else {
+       _showBottomSheetDestinasi(dest as Destinasi);
+    }
   }
 
   @override

@@ -21,6 +21,10 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
   List<Map<String, dynamic>> _galeriList = [];
   bool _isFavorited = false;
   Position? _currentPosition;
+  final ScrollController _scrollController = ScrollController();
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
+  bool _isAppBarCollapsed = false;
 
   @override
   void initState() {
@@ -37,6 +41,26 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
     }
     _fetchFavoriteStatus();
     _fetchLocation();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    final offset = _scrollController.offset;
+    final collapsed = offset > (350 - kToolbarHeight);
+    if (collapsed != _isAppBarCollapsed) {
+      if (mounted) {
+        setState(() {
+          _isAppBarCollapsed = collapsed;
+        });
+      }
+    }
   }
 
   Future<void> _fetchLocation() async {
@@ -91,16 +115,26 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
         });
       }
     } catch (e) {
-      debugPrint('Error fetching favorites: $e');
+      print('DB_ERROR: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Koneksi database gagal. Gagal memuat status favorit.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
   Future<void> _toggleFavorite() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Silakan login untuk menyimpan favorit')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Silakan login terlebih dahulu')),
+        );
+      }
       return;
     }
 
@@ -120,33 +154,46 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
 
     try {
       if (wasFavorited) {
+        // Hapus dari favorit
         await Supabase.instance.client
             .from('favorit')
             .delete()
             .eq('user_id', user.id)
             .eq('hotel_id', hotelId);
       } else {
-        await Supabase.instance.client.from('favorit').insert(payload);
+        // Tambah ke favorit
+        await Supabase.instance.client.from('favorit').insert({
+          'user_id': user.id,
+          'hotel_id': hotelId,
+        });
       }
 
       if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              _isFavorited ? 'Ditambahkan ke favorit' : 'Dihapus dari favorit',
+              _isFavorited ? 'Tersimpan ke Favorit' : 'Dihapus dari Favorit',
+              style: const TextStyle(color: Colors.white),
             ),
-            duration: const Duration(seconds: 1),
+            backgroundColor: _isFavorited ? Colors.green : Colors.redAccent,
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
     } catch (e) {
-      debugPrint('Error updating favorites: $e');
+      debugPrint('Error toggling favorite: $e');
+      print('DB_ERROR: $e');
       if (mounted) {
         setState(() {
           _isFavorited = wasFavorited;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Gagal memperbarui favorit')),
+          const SnackBar(
+            content: Text('Koneksi database gagal. Silakan coba lagi.'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -158,12 +205,12 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildImageHeader(context),
-                Padding(
+          CustomScrollView(
+            controller: _scrollController,
+            slivers: [
+              _buildSliverAppBar(context),
+              SliverToBoxAdapter(
+                child: Padding(
                   padding: const EdgeInsets.all(24.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,8 +232,8 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
                     ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
           _buildBottomBookingBar(context),
         ],
@@ -194,100 +241,184 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
     );
   }
 
-  Widget _buildImageHeader(BuildContext context) {
-    return Stack(
-      children: [
-        SizedBox(
-          height: 350,
-          width: double.infinity,
-          child: Image.network(
-            hotel['foto_utama_url'] ??
-                hotel['image_url'] ??
-                hotel['image'] ??
-                '',
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                color: Colors.grey.shade300,
-                child: const Center(
-                  child: Icon(Icons.broken_image, color: Colors.grey, size: 64),
-                ),
-              );
-            },
+  Widget _buildSliverAppBar(BuildContext context) {
+    // Collect all images (main + gallery)
+    final List<String> allImages = [];
+    final mainImage = hotel['foto_utama_url'] ?? hotel['image_url'] ?? hotel['image'] ?? '';
+    if (mainImage.isNotEmpty) allImages.add(mainImage);
+    
+    for (var item in _galeriList) {
+      final url = item['foto_url']?.toString() ?? '';
+      if (url.isNotEmpty && url != mainImage) {
+        allImages.add(url);
+      }
+    }
+
+    return SliverAppBar(
+      pinned: true,
+      expandedHeight: 350,
+      backgroundColor: _isAppBarCollapsed ? Colors.white : Colors.transparent,
+      elevation: _isAppBarCollapsed ? 2 : 0,
+      centerTitle: true,
+      leading: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: CircleAvatar(
+          backgroundColor: _isAppBarCollapsed ? Colors.transparent : Colors.black26,
+          child: IconButton(
+            icon: Icon(
+              Icons.arrow_back, 
+              color: _isAppBarCollapsed ? AppColors.textPrimary : Colors.white,
+              size: 20,
+            ),
+            onPressed: () => Navigator.pop(context),
           ),
         ),
-        SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                CircleAvatar(
-                  backgroundColor: Colors.black26,
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.arrow_back,
-                      color: Colors.white,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ),
-                Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: Colors.black26,
-                      child: IconButton(
-                        icon: Icon(
-                          _isFavorited ? Icons.favorite : Icons.favorite_border,
-                          color: _isFavorited ? Colors.red : Colors.white,
-                        ),
-                        onPressed: _toggleFavorite,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    CircleAvatar(
-                      backgroundColor: Colors.black26,
-                      child: IconButton(
-                        icon: const Icon(
-                          Icons.share_outlined,
-                          color: Colors.white,
-                        ),
-                        onPressed: () {
-                          final harga =
-                              (hotel['harga_termurah'] as num?)?.toInt() ?? 0;
-                          final formattedPrice = harga > 0
-                              ? harga.toString().replaceAllMapped(
-                                  RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-                                  (m) => '${m[1]}.',
-                                )
-                              : '0';
-                          final bintang = (hotel['bintang'] as num?)?.toInt() ?? 0;
-                          final namaHotel =
-                              hotel['nama']?.toString() ??
-                              hotel['name']?.toString() ??
-                              'Hotel';
-                          final slug = hotel['slug']?.toString() ?? '';
-                          final shareText =
-                              'Cek penginapan keren ini di Delira!\n\n'
-                              '🏢 $namaHotel\n'
-                              '⭐ Bintang $bintang\n'
-                              '💸 Mulai dari Rp $formattedPrice / malam\n\n'
-                              'Lihat detail selengkapnya di sini:\n'
-                              'https://delira.app/hotel/$slug\n\n'
-                              'Ayo liburan ke Medan dan booking sekarang di aplikasi Delira!';
-                          Share.share(shareText);
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+      ),
+      title: AnimatedOpacity(
+        opacity: _isAppBarCollapsed ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 200),
+        child: Text(
+          hotel['nama'] ?? hotel['name'] ?? '',
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+      actions: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: CircleAvatar(
+            backgroundColor: _isAppBarCollapsed ? Colors.transparent : Colors.black26,
+            child: IconButton(
+              icon: Icon(
+                _isFavorited ? Icons.favorite : Icons.favorite_border,
+                color: _isFavorited 
+                    ? Colors.red 
+                    : (_isAppBarCollapsed ? AppColors.textPrimary : Colors.white),
+                size: 20,
+              ),
+              onPressed: _toggleFavorite,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 8, right: 16),
+          child: CircleAvatar(
+            backgroundColor: _isAppBarCollapsed ? Colors.transparent : Colors.black26,
+            child: IconButton(
+              icon: Icon(
+                Icons.share_outlined, 
+                color: _isAppBarCollapsed ? AppColors.textPrimary : Colors.white,
+                size: 20,
+              ),
+              onPressed: () {
+                final harga = (hotel['harga_termurah'] as num?)?.toInt() ?? 0;
+                final formattedPrice = harga > 0
+                    ? harga.toString().replaceAllMapped(
+                        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                        (m) => '${m[1]}.',
+                      )
+                    : '0';
+                final bintang = (hotel['bintang'] as num?)?.toInt() ?? 0;
+                final namaHotel = hotel['nama']?.toString() ?? hotel['name']?.toString() ?? 'Hotel';
+                final slug = hotel['slug']?.toString() ?? '';
+                final shareText = 'Cek penginapan keren ini di Delira!\n\n'
+                    '🏢 $namaHotel\n'
+                    '⭐ Bintang $bintang\n'
+                    '💸 Mulai dari Rp $formattedPrice / malam\n\n'
+                    'Lihat detail selengkapnya di sini:\n'
+                    'https://delira.app/hotel/$slug\n\n'
+                    'Ayo liburan ke Medan dan booking sekarang di aplikasi Delira!';
+                Share.share(shareText);
+              },
             ),
           ),
         ),
       ],
+      shape: _isAppBarCollapsed 
+          ? const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+            )
+          : null,
+      flexibleSpace: FlexibleSpaceBar(
+        background: Stack(
+          children: [
+            PageView.builder(
+              controller: _pageController,
+              onPageChanged: (int page) {
+                if (mounted) {
+                  setState(() {
+                    _currentPage = page;
+                  });
+                }
+              },
+              itemCount: allImages.length,
+              itemBuilder: (context, index) {
+                final imageUrl = allImages[index];
+                
+                return Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Center(
+                      child: CircularProgressIndicator(
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                            : null,
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    print('LOG: Image loading failed for URL: $imageUrl, Error: $error');
+                    return Container(
+                      color: Colors.grey[200],
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(Icons.broken_image, size: 48, color: Colors.grey),
+                          SizedBox(height: 8),
+                          Text(
+                            'Gagal memuat gambar',
+                            style: TextStyle(color: Colors.grey, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+            if (allImages.length > 1)
+              Positioned(
+                bottom: 20,
+                left: 0,
+                right: 0,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: allImages.asMap().entries.map((entry) {
+                    return Container(
+                      width: _currentPage == entry.key ? 24.0 : 8.0,
+                      height: 8.0,
+                      margin: const EdgeInsets.symmetric(horizontal: 4.0),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(4),
+                        color: Colors.white.withAlpha(_currentPage == entry.key ? 255 : 120),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
+
+  // Menghapus _buildImageHeader lama
+
 
   Widget _buildTitleSection() {
     return Text(

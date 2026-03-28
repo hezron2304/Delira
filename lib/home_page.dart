@@ -9,6 +9,7 @@ import 'package:delira/map_page.dart';
 import 'package:delira/notifikasi_page.dart';
 import 'package:delira/ai_guide_page.dart';
 import 'package:delira/theme/app_colors.dart';
+import 'package:delira/models/destinasi.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -23,7 +24,7 @@ class _HomePageState extends State<HomePage> {
   final List<String> _categories = ['Semua', 'Sejarah', 'Religi', 'Kuliner'];
 
   bool _isLoading = true;
-  List<Map<String, dynamic>> _destinasiList = [];
+  List<Destinasi> _destinasiList = [];
   String _userName = 'Pengguna';
   String _userInitials = 'P';
   Position? _currentPosition;
@@ -78,13 +79,7 @@ class _HomePageState extends State<HomePage> {
       final res = await Supabase.instance.client.from('destinasi').select();
       if (mounted) {
         setState(() {
-          _destinasiList = List<Map<String, dynamic>>.from(res).map((d) {
-            d['badge'] = d['kategori'] ?? 'Wisata';
-            d['filter'] = d['kategori'] ?? 'Semua';
-            d['icon'] = Icons.place;
-            d['is_featured'] = d['is_featured'] ?? false;
-            return d;
-          }).toList();
+          _destinasiList = (res as List).map((d) => Destinasi.fromMap(d)).toList();
           _isLoading = false;
         });
       }
@@ -96,13 +91,13 @@ class _HomePageState extends State<HomePage> {
   }
 
 
-  List<Map<String, dynamic>> get _filteredDestinasi {
+  List<Destinasi> get _filteredDestinasi {
     if (_activeCategory == 'Semua') return _destinasiList;
-    return _destinasiList.where((d) => d['filter'] == _activeCategory).toList();
+    return _destinasiList.where((d) => d.kategori == _activeCategory).toList();
   }
 
-  List<Map<String, dynamic>> get _destinasiUnggulan {
-    return _filteredDestinasi.where((d) => d['is_featured'] == true).toList();
+  List<Destinasi> get _destinasiUnggulan {
+    return _filteredDestinasi.where((d) => d.isFeatured == true).toList();
   }
 
   @override
@@ -398,11 +393,11 @@ class _HomePageState extends State<HomePage> {
         separatorBuilder: (context, index) => const SizedBox(width: 16),
         itemBuilder: (context, index) {
           final item = items[index];
-          final String name = item['nama'] ?? 'Nav';
-          final String badge = item['badge'] ?? 'Wisata';
-          final num rating = item['rating'] ?? 0.0;
-          final String dist = LocationUtils.getDisplayDistance(item, _currentPosition);
-          final String imageUrl = item['image_url'] ?? '';
+          final String name = item.nama;
+          final String badge = item.kategori;
+          final double rating = item.rating;
+          final String dist = LocationUtils.getDisplayDistance(item.toMap(), _currentPosition);
+          final String imageUrl = item.fullImageUrl;
 
           return SizedBox(
             width: 280,
@@ -524,10 +519,10 @@ class _HomePageState extends State<HomePage> {
       padding: const EdgeInsets.symmetric(horizontal: 24.0),
       child: Column(
         children: items.map((item) {
-          final String name = item['nama'] ?? 'Nav';
-          final String kategori = item['kategori'] ?? 'Wisata'; // Use literal category text naturally
-          final num rating = item['rating'] ?? 0.0;
-          final String dist = LocationUtils.getDisplayDistance(item, _currentPosition);
+          final String name = item.nama;
+          final String kategori = item.kategori;
+          final double rating = item.rating;
+          final String dist = LocationUtils.getDisplayDistance(item.toMap(), _currentPosition);
 
           return Padding(
             padding: const EdgeInsets.only(bottom: 16),
@@ -560,7 +555,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                         child: Center(
                           child: Icon(
-                            item['icon'] ?? Icons.place,
+                            item.iconData,
                             color: AppColors.primaryDark,
                             size: 36,
                           ),
