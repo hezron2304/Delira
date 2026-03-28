@@ -77,13 +77,17 @@ class Destinasi {
   /// Mengecek apakah destinasi sedang buka berdasarkan waktu sistem sekarang.
   bool isOpenNow() {
     try {
+      if (jamBuka.toLowerCase().contains('24 jam')) return true;
+      if (jamBuka.isEmpty || jamTutup.isEmpty) return false;
+
       final now = DateTime.now();
       final currentTime = now.hour * 60 + now.minute;
 
       final bukaParts = jamBuka.split(':');
       final tutupParts = jamTutup.split(':');
 
-      if (bukaParts.length != 2 || tutupParts.length != 2) return false;
+      // Mentolerir format HH:MM:SS dari postgreSQL -> ambil saja index 0 dan 1
+      if (bukaParts.length < 2 || tutupParts.length < 2) return false;
 
       final bukaTime = int.parse(bukaParts[0]) * 60 + int.parse(bukaParts[1]);
       final tutupTime = int.parse(tutupParts[0]) * 60 + int.parse(tutupParts[1]);
@@ -95,6 +99,7 @@ class Destinasi {
 
       return currentTime >= bukaTime && currentTime <= tutupTime;
     } catch (e) {
+      debugPrint('Error checking isOpenNow for format jamBuka($jamBuka) / jamTutup($jamTutup): $e');
       return false;
     }
   }

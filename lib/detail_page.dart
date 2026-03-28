@@ -281,7 +281,7 @@ class _DetailPageState extends State<DetailPage> {
 
     return SliverAppBar(
       pinned: true,
-      expandedHeight: 350,
+      expandedHeight: 260,
       backgroundColor: _isAppBarCollapsed ? Colors.white : Colors.transparent,
       elevation: _isAppBarCollapsed ? 2 : 0,
       centerTitle: true,
@@ -433,6 +433,7 @@ class _DetailPageState extends State<DetailPage> {
             return Image.network(
               imageUrl,
               fit: BoxFit.cover,
+              filterQuality: FilterQuality.high,
               loadingBuilder: (context, child, loadingProgress) {
                 if (loadingProgress == null) return child;
                 return Center(
