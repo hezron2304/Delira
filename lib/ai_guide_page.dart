@@ -140,8 +140,8 @@ class _AIGuidePageState extends State<AIGuidePage>
     WidgetsBinding.instance.addObserver(this);
     
     // Initialize Gemini Models
-    _visionModel = GenerativeModel(model: 'gemini-2.0-flash-lite', apiKey: _geminiApiKey);
-    _chatModel = GenerativeModel(model: 'gemini-2.0-flash-lite', apiKey: _geminiApiKey);
+    _visionModel = GenerativeModel(model: 'gemini-2.5-flash', apiKey: _geminiApiKey);
+    _chatModel = GenerativeModel(model: 'gemini-2.5-flash', apiKey: _geminiApiKey);
 
     _messages.add({
       'role': 'bot',
@@ -216,7 +216,7 @@ class _AIGuidePageState extends State<AIGuidePage>
     Future.delayed(const Duration(seconds: 2), () {
       if (!mounted || !_isARMode) return;
       
-      _arTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
+      _arTimer = Timer.periodic(const Duration(seconds: 60), (_) async {
         if (!_isARMode || !_cameraReady || _cameraController == null) return;
         if (_isARDetecting || !_cameraController!.value.isInitialized) return;
       
