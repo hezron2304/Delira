@@ -7,6 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:delira/detail_page.dart';
 import 'package:delira/utils/location_utils.dart';
 import 'package:delira/models/destinasi.dart';
+import 'package:delira/theme/app_colors.dart';
+import 'package:flutter/services.dart';
 
 class MapPage extends StatefulWidget {
   final VoidCallback? onHotelRequested;
@@ -37,40 +39,90 @@ class _MapPageState extends State<MapPage> {
     if (mounted) {
       setState(() {
         _userPosition = pos;
-        // Re-build markers logic if needed, but here it's mainly for bottom sheet
+        // Center map to user once
+        if (pos != null) {
+          _mapController.move(LatLng(pos.latitude, pos.longitude), 14);
+        }
+        _buildMarkers(_allDestinasi, _allHotels);
       });
     }
   }
 
   Future<void> _loadMarkers() async {
     setState(() => _isLoading = true);
+    
+    // individual data holders
+    List<Destinasi> loadedDestinasi = [];
+    List<Map<String, dynamic>> loadedHotels = [];
+    String? errorSource;
+
     try {
-      final supabase = Supabase.instance.client;
+      // 1. Fetch Destinasi
+      try {
+        final destResponse = await Supabase.instance.client
+            .from('destinasi')
+            .select() // Fetch all to avoid missing required fields in Model.fromMap
+            .eq('is_active', true);
+        
+        final List<Map<String, dynamic>> rawDest = List<Map<String, dynamic>>.from(destResponse);
+        loadedDestinasi = rawDest.map((d) {
+          try {
+            return Destinasi.fromMap(d);
+          } catch (e) {
+            debugPrint('DEBUG: Skip Destinasi ID ${d['id']} due to parse error: $e');
+            return null;
+          }
+        }).whereType<Destinasi>().toList();
+        
+        debugPrint('DEBUG: Successfully fetched ${loadedDestinasi.length} destinasi');
+      } catch (e) {
+        debugPrint('DEBUG: Error fetching destinasi: $e');
+        errorSource = 'destinasi';
+      }
 
-      final response = await supabase
-          .from('destinasi')
-          .select('id, nama, kategori, deskripsi, latitude, longitude, rating, foto_utama_url, image_url')
-          .eq('is_active', true);
+      // 2. Fetch Hotels
+      try {
+        final hotelResponse = await Supabase.instance.client.from('hotel').select();
+        loadedHotels = List<Map<String, dynamic>>.from(hotelResponse);
+        debugPrint('DEBUG: Successfully fetched ${loadedHotels.length} hotels');
+      } catch (e) {
+        debugPrint('DEBUG: Error fetching hotels: $e');
+        errorSource = errorSource == null ? 'hotel' : 'data';
+      }
 
-      final hotelResponse = await supabase.from('hotel').select();
+      if (mounted) {
+        setState(() {
+          _allDestinasi = loadedDestinasi;
+          _allHotels = loadedHotels;
+          _buildMarkers(loadedDestinasi, loadedHotels);
+          _isLoading = false;
+        });
 
-      final List<Map<String, dynamic>> rawDestinasi = List<Map<String, dynamic>>.from(response);
-      final List<Destinasi> datadestinasi = rawDestinasi.map((d) => Destinasi.fromMap(d)).toList();
-      final List<Map<String, dynamic>> datahotel = List<Map<String, dynamic>>.from(hotelResponse);
-
-      setState(() {
-        _allDestinasi = datadestinasi;
-        _allHotels = datahotel;
-        _buildMarkers(datadestinasi, datahotel);
-        _isLoading = false;
-      });
+        // Inform user if partial failure occurred
+        if (errorSource != null && loadedDestinasi.isEmpty && loadedHotels.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Gagal mengambil data $errorSource. Periksa koneksi internet.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
+      debugPrint('DEBUG: Global map error: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Terjadi kesalahan sistem peta.'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
   void _buildMarkers(List<Destinasi> destData, List<Map<String, dynamic>> hotelData) {
-    final destMarkers = destData.map((dest) {
+    final destMarkers = destData
+        .where((d) => d.latitude != 0.0 && d.longitude != 0.0) // Filter invalid coordinates
+        .map((dest) {
       return Marker(
         point: LatLng(dest.latitude, dest.longitude),
         width: 40,
@@ -90,7 +142,9 @@ class _MapPageState extends State<MapPage> {
       );
     }).toList();
 
-    final hotelMarkers = hotelData.map((h) {
+    final hotelMarkers = hotelData
+        .where((h) => (h['latitude'] != null && h['latitude'] != 0.0)) // Filter invalid coordinates
+        .map((h) {
       return Marker(
         point: LatLng(
             (h['latitude'] as num?)?.toDouble() ?? 0.0,
@@ -112,7 +166,38 @@ class _MapPageState extends State<MapPage> {
       );
     }).toList();
 
-    _markers = [...destMarkers, ...hotelMarkers];
+    final userMarker = _userPosition != null 
+      ? [Marker(
+          point: LatLng(_userPosition!.latitude, _userPosition!.longitude),
+          width: 60,
+          height: 60,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: Colors.blue.withAlpha(50),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: Colors.blue,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                  boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                ),
+              ),
+            ],
+          ),
+        )]
+      : [];
+
+    _markers = [...destMarkers, ...hotelMarkers, ...userMarker];
   }
 
   Future<void> _openNavigation(double lat, double lng, String nama) async {
@@ -461,122 +546,154 @@ class _MapPageState extends State<MapPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: const LatLng(3.5952, 98.6722),
-              initialZoom: 13,
-              interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.all,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.transparent, // Immersive map feel
+        systemNavigationBarIconBrightness: Brightness.dark,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Scaffold(
+        body: Stack(
+          children: [
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                initialCenter: const LatLng(3.5952, 98.6722),
+                initialZoom: 13,
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.all,
+                ),
               ),
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.delira.app',
-              ),
-              MarkerLayer(markers: _markers),
-            ],
-          ),
-          
-          if (_isLoading)
-            const Center(
-              child: CircularProgressIndicator(color: Color(0xFF1A6B4A)),
-            ),
-
-          Positioned(
-            top: 48, // slightly lower to account for status bar since no appbar
-            left: 16,
-            right: 16,
-            child: Column(
               children: [
-                // Search bar
-                Container(
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8)],
-                  ),
-                  child: const TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Cari lokasi...',
-                      prefixIcon: Icon(Icons.search, color: Color(0xFF1A6B4A)),
-                      suffixIcon: Icon(Icons.tune, color: Color(0xFF1A6B4A)),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.symmetric(vertical: 14),
-                    ),
-                  ),
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.delira.app',
                 ),
-                const SizedBox(height: 8),
-                // Category chips horizontal scroll
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: ['Semua', 'Sejarah', 'Religi', 'Kuliner', 'Budaya'].map((cat) {
-                      final isActive = _selectedCategory == cat;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: FilterChip(
-                          label: Text(cat),
-                          selected: isActive,
-                          onSelected: (_) => _filterByCategory(cat),
-                          selectedColor: const Color(0xFF1A6B4A),
-                          backgroundColor: Colors.white,
-                          labelStyle: TextStyle(
-                            color: isActive ? Colors.white : const Color(0xFF1A6B4A),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          side: const BorderSide(color: Color(0xFF1A6B4A)),
-                          showCheckmark: false,
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
+                MarkerLayer(markers: _markers),
               ],
             ),
-          ),
-          
-          Positioned(
-            right: 16,
-            bottom: 100,
-            child: FloatingActionButton.small(
-              heroTag: 'myLocBtn',
-              onPressed: () async {
-                LocationPermission permission = await Geolocator.checkPermission();
-                if (permission == LocationPermission.denied) {
-                  permission = await Geolocator.requestPermission();
-                }
-                if (permission == LocationPermission.deniedForever) {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Izin lokasi ditolak permanen. Silakan ubah di pengaturan.')),
-                  );
-                  return;
-                }
-                if (permission == LocationPermission.whileInUse ||
-                    permission == LocationPermission.always) {
-                  Position pos = await Geolocator.getCurrentPosition();
-                  _mapController.move(LatLng(pos.latitude, pos.longitude), 15);
-                } else {
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Izin lokasi ditolak')),
-                  );
-                }
-              },
-              backgroundColor: Colors.white,
-              foregroundColor: const Color(0xFF1A6B4A),
-              elevation: 4,
-              child: const Icon(Icons.my_location),
+            
+            if (_isLoading)
+              const Center(
+                child: CircularProgressIndicator(color: Color(0xFF1A6B4A)),
+              ),
+
+            Positioned(
+              top: 48, 
+              left: 16,
+              right: 16,
+              child: Column(
+                children: [
+                  Container(
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(40),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withAlpha(20),
+                          blurRadius: 10,
+                          spreadRadius: 2,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: TextField(
+                      decoration: InputDecoration(
+                        hintText: 'Cari lokasi...',
+                        hintStyle: TextStyle(color: Colors.grey.withAlpha(150), fontSize: 13),
+                        prefixIcon: const Icon(Icons.search, color: AppColors.primary),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: ['Semua', 'Sejarah', 'Religi', 'Kuliner', 'Budaya'].map((cat) {
+                        final isActive = _selectedCategory == cat;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 12),
+                          child: GestureDetector(
+                            onTap: () => _filterByCategory(cat),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isActive ? AppColors.primary : Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: isActive ? Colors.transparent : AppColors.border,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withAlpha( isActive ? 40 : 10),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                cat,
+                                style: TextStyle(
+                                  color: isActive ? Colors.white : AppColors.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            
+            Positioned(
+              right: 16,
+              bottom: 100,
+              child: FloatingActionButton.small(
+                heroTag: 'myLocBtn',
+                onPressed: () async {
+                  LocationPermission permission = await Geolocator.checkPermission();
+                  if (permission == LocationPermission.denied) {
+                    permission = await Geolocator.requestPermission();
+                  }
+                  if (permission == LocationPermission.deniedForever) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Izin lokasi ditolak permanen. Silakan ubah di pengaturan.')),
+                    );
+                    return;
+                  }
+                  if (permission == LocationPermission.whileInUse ||
+                      permission == LocationPermission.always) {
+                    Position pos = await Geolocator.getCurrentPosition();
+                    setState(() {
+                      _userPosition = pos;
+                      _buildMarkers(_allDestinasi, _allHotels);
+                    });
+                    _mapController.move(LatLng(pos.latitude, pos.longitude), 15);
+                  } else {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Izin lokasi ditolak')),
+                    );
+                  }
+                },
+                backgroundColor: Colors.white,
+                foregroundColor: const Color(0xFF1A6B4A),
+                elevation: 4,
+                child: const Icon(Icons.my_location),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:delira/utils/location_utils.dart';
@@ -67,65 +68,74 @@ class _SavedHotelsPageState extends State<SavedHotelsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        title: const Text(
-          'Tempat Tersimpan',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.bold,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: AppColors.surface, // Match background
+        systemNavigationBarIconBrightness: Brightness.dark,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Scaffold(
+        backgroundColor: AppColors.surface,
+        appBar: AppBar(
+          title: const Text(
+            'Tempat Tersimpan',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          backgroundColor: Colors.white,
+          elevation: 0,
+          centerTitle: true,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            onPressed: () => Navigator.pop(context),
           ),
         ),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _savedItems.isEmpty
-              ? _buildEmptyState()
-              : GridView.builder(
-                  padding: const EdgeInsets.all(24),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 0.48,
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _savedItems.isEmpty
+                ? _buildEmptyState()
+                : GridView.builder(
+                    padding: const EdgeInsets.all(24),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      childAspectRatio: 0.48,
+                    ),
+                    itemCount: _savedItems.length,
+                    itemBuilder: (context, index) {
+                      final item = _savedItems[index];
+                      final hotel = item['hotel'] as Map<String, dynamic>?;
+
+                      if (hotel == null) return const SizedBox.shrink();
+
+                      final rawPrice =
+                          (hotel['harga_termurah'] as num?)?.toInt() ?? 0;
+
+                      return HotelCard(
+                        name: hotel['nama'] ?? hotel['name'] ?? 'Hotel',
+                        rating: (hotel['rating'] as num?)?.toDouble() ?? 0.0,
+                        distance: LocationUtils.getDisplayDistance(hotel, _currentPosition),
+                        price: rawPrice > 0
+                            ? 'Rp ${_formatRupiah(rawPrice)}'
+                            : 'Hubungi Kami',
+                        imageUrl: hotel['foto_utama_url'] ??
+                            hotel['image_url'] ??
+                            hotel['image'] ??
+                            '',
+                        isSelected: false,
+                        hotelData: hotel,
+                        onTap: () {
+                          // Navigasi detail sudah dihandle otomatis oleh HotelCard
+                        },
+                      );
+                    },
                   ),
-                  itemCount: _savedItems.length,
-                  itemBuilder: (context, index) {
-                    final item = _savedItems[index];
-                    final hotel = item['hotel'] as Map<String, dynamic>?;
-
-                    if (hotel == null) return const SizedBox.shrink();
-
-                    final rawPrice =
-                        (hotel['harga_termurah'] as num?)?.toInt() ?? 0;
-
-                    return HotelCard(
-                      name: hotel['nama'] ?? hotel['name'] ?? 'Hotel',
-                      rating: (hotel['rating'] as num?)?.toDouble() ?? 0.0,
-                      distance: LocationUtils.getDisplayDistance(hotel, _currentPosition),
-                      price: rawPrice > 0
-                          ? 'Rp ${_formatRupiah(rawPrice)}'
-                          : 'Hubungi Kami',
-                      imageUrl: hotel['foto_utama_url'] ??
-                          hotel['image_url'] ??
-                          hotel['image'] ??
-                          '',
-                      isSelected: false,
-                      hotelData: hotel,
-                      onTap: () {
-                        // Navigasi detail sudah dihandle otomatis oleh HotelCard
-                      },
-                    );
-                  },
-                ),
+      ),
     );
   }
 

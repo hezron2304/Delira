@@ -29,6 +29,7 @@ class _HomePageState extends State<HomePage> {
   List<Destinasi> _destinasiList = [];
   String _userName = 'Pengguna';
   String _userInitials = 'P';
+  String? _avatarUrl;
   Position? _currentPosition;
 
   @override
@@ -60,6 +61,7 @@ class _HomePageState extends State<HomePage> {
         if (res != null && mounted) {
           setState(() {
             _userName = res['nama_lengkap'] ?? 'Pengguna';
+            _avatarUrl = res['foto_url'];
             if (_userName.isNotEmpty) {
               final parts = _userName.split(' ');
               if (parts.length > 1) {
@@ -102,16 +104,19 @@ class _HomePageState extends State<HomePage> {
     return _filteredDestinasi.where((d) => d.isFeatured == true).toList();
   }
 
+  Color get _navColor {
+    if (_currentIndex == 1) return Colors.transparent; // Map
+    if (_currentIndex == 2 || _currentIndex == 4) return Colors.white; // Hotel, AI Guide
+    return AppColors.surface; // Home, Profile
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Menjadikan ikon indikator putih untuk tab Beranda (Hijau) dan gelap untuk tab lainnya (Putih)
-    final bool isDarkBackground = _currentIndex == 0 || _currentIndex == 4;
-    
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: isDarkBackground ? Brightness.light : Brightness.dark,
-        systemNavigationBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark, 
+        systemNavigationBarColor: _navColor, // Match active tab background
         systemNavigationBarIconBrightness: Brightness.dark,
         systemNavigationBarContrastEnforced: false,
       ),
@@ -199,35 +204,47 @@ class _HomePageState extends State<HomePage> {
       ),
       child: Column(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    _userInitials, 
-                    style: const TextStyle(
-                      color: AppColors.primary, 
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _currentIndex = 3; // Navigate to Profil tab
+              });
+            },
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    image: _avatarUrl != null 
+                        ? DecorationImage(image: NetworkImage(_avatarUrl!), fit: BoxFit.cover) 
+                        : null,
                   ),
+                  child: _avatarUrl == null 
+                    ? Center(
+                        child: Text(
+                          _userInitials, 
+                          style: const TextStyle(
+                            color: AppColors.primary, 
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                      )
+                    : null,
                 ),
-              ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Selamat datang 👋', style: TextStyle(color: Colors.white.withAlpha(200), fontSize: 13)),
-                  Text(_userName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                ],
-              ),
-            ],
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Selamat datang 👋', style: TextStyle(color: Colors.white.withAlpha(200), fontSize: 13)),
+                    Text(_userName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                  ],
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 24),
           Container(
@@ -663,9 +680,9 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildBottomNav() {
     return BottomAppBar(
-      color: Colors.white,
+      color: _navColor, // Match active tab background
       padding: EdgeInsets.zero,
-      elevation: 20,
+      elevation: 0, // No border line
       child: SafeArea(
         child: SizedBox(
           height: 64,

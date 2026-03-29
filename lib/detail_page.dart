@@ -240,8 +240,8 @@ class _DetailPageState extends State<DetailPage> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light, // Ikon cerah di atas gambar header
-        systemNavigationBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light, // Keep light for image header
+        systemNavigationBarColor: Colors.white, 
         systemNavigationBarIconBrightness: Brightness.dark,
         systemNavigationBarContrastEnforced: false,
       ),

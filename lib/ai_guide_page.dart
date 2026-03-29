@@ -494,6 +494,22 @@ class _AIGuidePageState extends State<AIGuidePage>
 
   Future<void> _sendMessage(String text) async {
     if (text.trim().isEmpty) return;
+    
+    // Check connection or basic validation
+    bool isLikelyOffline = false;
+    try {
+      final result = await InternetAddress.lookup('google.com').timeout(const Duration(seconds: 3));
+      if (result.isEmpty || result[0].rawAddress.isEmpty) isLikelyOffline = true;
+    } catch (_) {
+      isLikelyOffline = true;
+    }
+
+    if (isLikelyOffline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Koneksi internet tidak stabil. Coba lagi.'), backgroundColor: Colors.orange),
+      );
+    }
+
     setState(() {
       _messages.add({'role': 'user', 'text': text});
       _isTyping = true;
@@ -531,16 +547,88 @@ class _AIGuidePageState extends State<AIGuidePage>
       }
     } catch (e) {
       debugPrint('DEBUG: Error Chat: $e');
-      const fallback =
-          '🤔 Maaf, saya belum punya informasi tentang itu. Coba tanyakan tentang destinasi wisata, kuliner, hotel, atau transportasi di Medan ya! 😊';
+      String errorMsg = '🤔 Maaf, saya sedang gangguan sebentar. Coba tanyakan lagi ya!';
+      
+      if (e.toString().contains('429') || e.toString().contains('quota')) {
+        errorMsg = '⚠️ Wah, saya lagi ramai pengunjung! Beri saya waktu 30 detik untuk istirahat ya. 🙏';
+        _triggerCooldown();
+      }
+
       if (!mounted) return;
       setState(() {
-        _messages.add({'role': 'bot', 'text': fallback});
+        _messages.add({'role': 'bot', 'text': errorMsg});
         _isTyping = false;
       });
       _scrollToBottom();
-      _saveChatHistory(text, fallback);
+      _saveChatHistory(text, 'ERROR: $e');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Delira Error: $e'), backgroundColor: Colors.red),
+      );
     }
+  }
+
+  void _showEmojiPicker() {
+    final List<String> travelEmojis = [
+      '🗺️', '📍', '🕌', '🏰', '⛪', '🍜', '🍲', '☕', '🍰', '🏨', 
+      '🚗', '✈️', '🏝️', '🎒', '📸', '🚌', '🛵', '🎟️', '🛍️', '💰',
+      '⭐', '✅', '❤️', '👋', '😊', '😍', '🙌', '🙏', '✨', '🔥',
+      ' Medan ', ' Kuliner ', ' Wisata ', ' Hotel '
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          height: 300,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Pilih Emoji atau Kata Kunci', 
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 16),
+              Expanded(
+                child: GridView.builder(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 6,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                  ),
+                  itemCount: travelEmojis.length,
+                  itemBuilder: (context, index) {
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _textController.text += travelEmojis[index];
+                          // Move cursor to end
+                          _textController.selection = TextSelection.fromPosition(
+                            TextPosition(offset: _textController.text.length),
+                          );
+                        });
+                        Navigator.pop(context);
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(travelEmojis[index], style: const TextStyle(fontSize: 20)),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _saveChatHistory(String pesan, String balasan) async {
@@ -1217,11 +1305,11 @@ class _AIGuidePageState extends State<AIGuidePage>
                 ),
               ),
               Padding(
-                // TASK 2: Dynamic padding logic for Infinix / All screens - Increased gap
+                // Dynamic padding: Ensures comfortable distance from system nav bar or keyboard
                 padding: EdgeInsets.only(
                   bottom: MediaQuery.of(context).viewInsets.bottom > 0 
-                      ? 16 // Gap when keyboard open
-                      : MediaQuery.of(context).padding.bottom + 26, // Extra lift from nav bar
+                      ? 20 // Gap when keyboard open
+                      : MediaQuery.of(context).padding.bottom + 32, // More lift from navigation bar
                 ),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(0, 6, 0, 12),
@@ -1232,57 +1320,58 @@ class _AIGuidePageState extends State<AIGuidePage>
                         child: TextField(
                           controller: _textController,
                           minLines: 1,
-                          maxLines: 3,
+                          maxLines: 4,
                           textInputAction: TextInputAction.send,
                           onSubmitted: (val) => _sendMessage(val),
                           decoration: InputDecoration(
                             hintText: _isListening ? 'Mendengarkan...' : 'Tanyakan sesuatu...',
                             hintStyle: TextStyle(
                                 color: _isListening ? Colors.redAccent : Colors.grey[400]),
+                            prefixIcon: IconButton(
+                               icon: const Icon(Icons.insert_emoticon_outlined, size: 22, color: Colors.grey),
+                               onPressed: _showEmojiPicker,
+                             ),
+                            suffixIcon: _speechEnabled 
+                                ? IconButton(
+                                    icon: Icon(
+                                      _isListening ? Icons.stop_circle_rounded : Icons.mic_none_rounded,
+                                      color: _isListening ? Colors.redAccent : Colors.grey[600],
+                                    ),
+                                    onPressed: _isListening ? _stopListening : _startListening,
+                                  )
+                                : null,
                             filled: true,
                             fillColor: const Color(0xFFF5F5F5),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(24),
+                              borderRadius: BorderRadius.circular(28),
                               borderSide: BorderSide.none,
                             ),
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 10),
+                                horizontal: 16, vertical: 12),
                             isDense: true,
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      if (_speechEnabled)
-                        GestureDetector(
-                          onTap: _isListening ? _stopListening : _startListening,
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: _isListening
-                                  ? Colors.redAccent.withAlpha(30)
-                                  : Colors.grey[100],
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              _isListening ? Icons.mic : Icons.mic_none_rounded,
-                              color: _isListening ? Colors.redAccent : Colors.grey[600],
-                              size: 22,
-                            ),
-                          ),
-                        ),
-                      const SizedBox(width: 8),
+                      // Modern Send Circle Button
                       GestureDetector(
                         onTap: () => _sendMessage(_textController.text),
                         child: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
+                          width: 48,
+                          height: 48,
+                          decoration: const BoxDecoration(
                             color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(12),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
                           ),
                           child: const Icon(Icons.send_rounded,
-                              color: Colors.white, size: 20),
+                              color: Colors.white, size: 22),
                         ),
                       ),
                     ],

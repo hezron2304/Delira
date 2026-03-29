@@ -119,9 +119,9 @@ class _SearchPageState extends State<SearchPage> {
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.dark,
-        systemNavigationBarColor: Colors.transparent,
-        systemNavigationBarIconBrightness: Brightness.dark,
-        systemNavigationBarContrastEnforced: false,
+        systemNavigationBarColor: AppColors.primary,
+        systemNavigationBarIconBrightness: Brightness.light,
+        systemNavigationBarContrastEnforced: true,
       ),
       child: Scaffold(
         backgroundColor: const Color(0xFFF5F5F5),

@@ -26,11 +26,11 @@ Future<void> main() async {
   
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent, // Transparan di atas
-      statusBarIconBrightness: Brightness.light, 
-      systemNavigationBarColor: Colors.transparent, // Transparan di bawah (Bilah Jendela/Home/Back)
+      statusBarColor: Colors.transparent, 
+      statusBarIconBrightness: Brightness.dark, 
+      systemNavigationBarColor: AppColors.surface, // Background-matching default
       systemNavigationBarIconBrightness: Brightness.dark,
-      systemNavigationBarContrastEnforced: false, // Memastikan transparansi penuh di Android baru
+      systemNavigationBarContrastEnforced: false, 
     ),
   );
 
