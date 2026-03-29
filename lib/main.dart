@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:delira/login_page.dart';
 import 'package:delira/home_page.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/services.dart';
 import 'package:delira/theme/app_colors.dart';
 
 Future<void> main() async {
@@ -12,6 +13,21 @@ Future<void> main() async {
     url: 'https://pdhvqcbnsncxkfspasjq.supabase.co',
     anonKey:
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkaHZxY2Juc25jeGtmc3Bhc2pxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4MzU4MDAsImV4cCI6MjA4OTQxMTgwMH0.jnKXzrsmsKQ5bq8cvl9FAK70TfggD8XbJuAmgXj6rq8',
+  );
+
+  // >>> GLOBAL SYSTEM UI / EDGE-TO-EDGE FIX <<<
+  // Mengaktifkan mode layar penuh (Edge-to-Edge) sehingga area Status Bar (atas) 
+  // dan Navigation Bar (bawah - Jendela/Home/Back) menjadi transparan mengikuti warna halaman.
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent, // Transparan di atas
+      statusBarIconBrightness: Brightness.light, 
+      systemNavigationBarColor: Colors.transparent, // Transparan di bawah (Bilah Jendela/Home/Back)
+      systemNavigationBarIconBrightness: Brightness.dark,
+      systemNavigationBarContrastEnforced: false, // Memastikan transparansi penuh di Android baru
+    ),
   );
 
   runApp(const MyApp());

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shimmer/shimmer.dart';
@@ -114,14 +115,24 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildSearchBar(),
-            Expanded(child: _buildBodyContent()),
-          ],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.dark,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF5F5F5),
+        body: SafeArea(
+          top: false, // Edge-to-Edge
+          child: Column(
+            children: [
+              _buildSearchBar(),
+              Expanded(child: _buildBodyContent()),
+            ],
+          ),
         ),
       ),
     );
@@ -130,7 +141,7 @@ class _SearchPageState extends State<SearchPage> {
   Widget _buildSearchBar() {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.only(top: 20.0, left: 20.0, right: 20.0, bottom: 16.0),
+      padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 8.0, left: 20.0, right: 20.0, bottom: 16.0),
       child: Container(
         height: 56,
         padding: const EdgeInsets.symmetric(horizontal: 16.0),

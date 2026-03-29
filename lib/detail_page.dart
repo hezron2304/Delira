@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:delira/theme/app_colors.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:delira/utils/location_utils.dart';
@@ -218,8 +219,16 @@ class _DetailPageState extends State<DetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light, // Ikon cerah di atas gambar header
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.dark,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.white,
       body: CustomScrollView(
         controller: _scrollController,
         slivers: [
@@ -257,6 +266,7 @@ class _DetailPageState extends State<DetailPage> {
         ],
       ),
       bottomSheet: _buildBottomActionBar(context),
+      ),
     );
   }
 
@@ -299,7 +309,7 @@ class _DetailPageState extends State<DetailPage> {
       elevation: _isAppBarCollapsed ? 2 : 0,
       centerTitle: true,
       leading: Padding(
-        padding: const EdgeInsets.all(8.0),
+        padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 8.0, left: 12.0, bottom: 8.0),
         child: CircleAvatar(
           backgroundColor: _isAppBarCollapsed ? Colors.transparent : Colors.black26,
           child: IconButton(
@@ -326,7 +336,7 @@ class _DetailPageState extends State<DetailPage> {
       ),
       actions: [
         Padding(
-          padding: const EdgeInsets.all(8.0),
+          padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 8.0, right: 12.0, bottom: 8.0),
           child: CircleAvatar(
             backgroundColor: _isAppBarCollapsed ? Colors.transparent : Colors.black26,
             child: IconButton(
@@ -1195,8 +1205,10 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   Widget _buildBottomActionBar(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    return SafeArea(
+      bottom: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
         color: Colors.white,
         boxShadow: [
@@ -1323,8 +1335,9 @@ class _DetailPageState extends State<DetailPage> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 class _GridPainter extends CustomPainter {

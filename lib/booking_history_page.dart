@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:delira/e_ticket_page.dart';
@@ -53,8 +54,16 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.dark,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text('Riwayat Pemesanan', style: GoogleFonts.inter(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
         backgroundColor: Colors.white,
@@ -272,6 +281,7 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
           );
         },
       ),
-    );
-  }
+    ),
+  );
+}
 }

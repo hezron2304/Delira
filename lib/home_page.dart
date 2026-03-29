@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:delira/utils/location_utils.dart';
@@ -103,72 +104,92 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      resizeToAvoidBottomInset: _currentIndex == 4,
-      backgroundColor: AppColors.surface,
-      body: SafeArea(
-        bottom: false,
-        child: _currentIndex == 3
-            ? const ProfilPage()
-            : _currentIndex == 2
-                ? const HotelPage()
-                : _currentIndex == 4
-                    ? AIGuidePage(onBackPressed: () => setState(() => _currentIndex = 0))
-                    : _currentIndex == 1
-                    ? MapPage(onHotelRequested: () {
-                        setState(() {
-                          _currentIndex = 2; // Switch to Hotel tab
-                        });
-                      })
-                    : SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildHeader(),
-                    const SizedBox(height: 24),
-                    _buildCategoryChips(),
-                    const SizedBox(height: 24),
-                    _buildSectionTitle('Destinasi Unggulan'),
-                    const SizedBox(height: 16),
-                    _isLoading ? _buildShimmerHorizontal() : _buildDestinasiUnggulanList(),
-                    const SizedBox(height: 24),
-                    _buildSectionTitle('Terdekat dari Kamu'),
-                    const SizedBox(height: 16),
-                    _isLoading ? _buildShimmerVertical() : _buildTerdekatList(),
-                    const SizedBox(height: 24),
-                  ],
+    // Menjadikan ikon indikator putih untuk tab Beranda (Hijau) dan gelap untuk tab lainnya (Putih)
+    final bool isDarkBackground = _currentIndex == 0 || _currentIndex == 4;
+    
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: isDarkBackground ? Brightness.light : Brightness.dark,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.dark,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Scaffold(
+        resizeToAvoidBottomInset: _currentIndex == 4,
+        backgroundColor: AppColors.surface,
+        body: SafeArea(
+          top: false,
+          bottom: false,
+          child: _currentIndex == 3
+              ? const ProfilPage()
+              : _currentIndex == 2
+                  ? const HotelPage()
+                  : _currentIndex == 4
+                      ? AIGuidePage(onBackPressed: () => setState(() => _currentIndex = 0))
+                      : _currentIndex == 1
+                          ? MapPage(onHotelRequested: () {
+                              setState(() {
+                                _currentIndex = 2;
+                              });
+                            })
+                          : SingleChildScrollView(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _buildHeader(context),
+                                  const SizedBox(height: 24),
+                                  _buildCategoryChips(),
+                                  const SizedBox(height: 24),
+                                  _buildSectionTitle('Destinasi Unggulan'),
+                                  const SizedBox(height: 16),
+                                  _isLoading ? _buildShimmerHorizontal() : _buildDestinasiUnggulanList(),
+                                  const SizedBox(height: 24),
+                                  _buildSectionTitle('Terdekat dari Kamu'),
+                                  const SizedBox(height: 16),
+                                  _isLoading ? _buildShimmerVertical() : _buildTerdekatList(),
+                                  const SizedBox(height: 24),
+                                ],
+                              ),
+                            ),
+        ),
+        bottomNavigationBar: _currentIndex == 4 ? const SizedBox.shrink() : _buildBottomNav(),
+        floatingActionButton: _currentIndex == 4
+            ? null
+            : SizedBox(
+                width: 66,
+                height: 66,
+                child: FittedBox(
+                  child: FloatingActionButton(
+                    onPressed: () {
+                      setState(() {
+                        _currentIndex = 4;
+                      });
+                    },
+                    backgroundColor: _currentIndex == 4 ? AppColors.primaryDark : AppColors.primary,
+                    shape: const CircleBorder(),
+                    elevation: 4,
+                    heroTag: 'aiGuideMainBtn',
+                    child: const Icon(Icons.smart_toy_outlined, color: Colors.white, size: 32),
+                  ),
                 ),
               ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       ),
-      bottomNavigationBar: _currentIndex == 4 ? const SizedBox.shrink() : _buildBottomNav(),
-      floatingActionButton: _currentIndex == 4 ? null : Transform.translate(
-        offset: const Offset(0, 14), // Mendorong FAB agak ke bawah
-        child: SizedBox(
-          width: 66,
-          height: 66,
-          child: FittedBox(
-            child: FloatingActionButton(
-              onPressed: () {
-                setState(() {
-                  _currentIndex = 4;
-                });
-              },
-              backgroundColor: _currentIndex == 4 ? AppColors.primaryDark : AppColors.primary, 
-              shape: const CircleBorder(),
-              elevation: 4,
-              heroTag: 'aiGuideMainBtn',
-              child: const Icon(Icons.smart_toy_outlined, color: Colors.white, size: 32),
-            ),
-          ),
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
+    // Mengambil tinggi poni layar (Notch / Status Bar) agar teks tidak tertutup
+    final double statusBarHeight = MediaQuery.of(context).padding.top;
+    
     return Container(
-      padding: const EdgeInsets.all(24.0),
+      padding: EdgeInsets.only(
+        top: statusBarHeight + 16.0,
+        left: 24.0,
+        right: 24.0,
+        bottom: 20.0,
+      ),
       decoration: const BoxDecoration(
         color: AppColors.primary,
         borderRadius: BorderRadius.only(
@@ -180,10 +201,23 @@ class _HomePageState extends State<HomePage> {
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: Colors.white24,
-                child: Text(_userInitials, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    _userInitials, 
+                    style: const TextStyle(
+                      color: AppColors.primary, 
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(width: 12),
               Column(
@@ -632,42 +666,44 @@ class _HomePageState extends State<HomePage> {
       color: Colors.white,
       padding: EdgeInsets.zero,
       elevation: 20,
-      child: SizedBox(
-        height: 70,
-        child: Row(
-          children: [
-            Expanded(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildNavItem(Icons.home, 'Beranda', 0),
-                  _buildNavItem(Icons.map_outlined, 'Peta', 1),
-                ],
+      child: SafeArea(
+        child: SizedBox(
+          height: 64,
+          child: Row(
+            children: [
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildNavItem(Icons.home, 'Beranda', 0),
+                    _buildNavItem(Icons.map_outlined, 'Peta', 1),
+                  ],
+                ),
               ),
-            ),
-            SizedBox(
-              width: 80,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: const [
-                  Text(
-                    'AI Guide',
-                    style: TextStyle(color: AppColors.primaryDark, fontSize: 11, fontWeight: FontWeight.bold),
-                  ),
-                  SizedBox(height: 6),
-                ],
+              SizedBox(
+                width: 80,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: const [
+                    Text(
+                      'AI Guide',
+                      style: TextStyle(color: AppColors.primaryDark, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 10),
+                  ],
+                ),
               ),
-            ),
-            Expanded(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildNavItem(Icons.hotel_outlined, 'Hotel', 2),
-                  _buildNavItem(Icons.person_outline, 'Profil', 3),
-                ],
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildNavItem(Icons.hotel_outlined, 'Hotel', 2),
+                    _buildNavItem(Icons.person_outline, 'Profil', 3),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

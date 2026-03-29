@@ -162,7 +162,7 @@ class _ProfilPageState extends State<ProfilPage> {
         // Green container
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(24, 40, 24, 76), // extra bottom for overlap
+          padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 24.0, 24, 76), // extra bottom for overlap
           decoration: const BoxDecoration(
             color: AppColors.primary,
             borderRadius: BorderRadius.only(

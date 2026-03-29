@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:delira/theme/app_colors.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:camera/camera.dart';
+import 'package:image_picker/image_picker.dart';
 
 class AIGuidePage extends StatefulWidget {
   final VoidCallback? onBackPressed;
@@ -12,18 +15,27 @@ class AIGuidePage extends StatefulWidget {
   State<AIGuidePage> createState() => _AIGuidePageState();
 }
 
-class _AIGuidePageState extends State<AIGuidePage> {
+class _AIGuidePageState extends State<AIGuidePage> with SingleTickerProviderStateMixin {
   int _selectedTab = 1;
   bool _isARMode = true;
 
-  static const String _geminiApiKey = 'AIzaSyBlhw6gDvdrMfd_tmwAf2UaZwdyQ3tDvIc';
-  static const String _geminiUrl =
-      'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent';
+  static const String _n8nVisionWebhookUrl = 'https://n8n.pamitran-garden.id/webhook/delira-vision';
+  static const String _n8nChatWebhookUrl   = 'https://n8n.pamitran-garden.id/webhook/delira-chat';
 
   final List<Map<String, String>> _messages = [];
   bool _isTyping = false;
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+
+  // State untuk Camera & Scan Mode
+  CameraController? _cameraController;
+  List<CameraDescription>? _cameras;
+  bool _isCameraInitialized = false;
+  late AnimationController _animationController;
+  late Animation<double> _scanAnimation;
+  bool _isProcessing = false;
+  String _detectedTitle = 'Scanner Siap';
+  String _detectedResult = 'Arahkan kamera ke landmark atau objek, lalu tekan tombol potret.';
 
   final Map<String, String> _answerBank = {
     // Tempat wisata
@@ -91,6 +103,174 @@ class _AIGuidePageState extends State<AIGuidePage> {
       'text':
           'Halo! 👋 Saya MedanBot, asisten wisata Kota Medan. Ada yang bisa saya bantu? 🗺️',
     });
+
+    _initCamera();
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+    
+    // Animasikan dari atas kotak ke bawah (kotak ukuran 250, jadi kira-kira dari -110 ke 110)
+    _scanAnimation = Tween<double>(begin: -110.0, end: 110.0).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOutSine,
+    ));
+  }
+
+  Future<void> _initCamera() async {
+    try {
+      _cameras = await availableCameras();
+      if (_cameras != null && _cameras!.isNotEmpty) {
+        // Gunakan resolusi medium untuk mencegah Payload gambar Base64 terlalu besar
+        _cameraController = CameraController(_cameras![0], ResolutionPreset.medium);
+        await _cameraController!.initialize();
+        if (mounted) {
+          setState(() {
+            _isCameraInitialized = true;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Kamera error: $e');
+    }
+  }
+
+  Future<void> _captureAndAnalyzeImage() async {
+    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
+    if (_isProcessing) return;
+
+    setState(() {
+      _isProcessing = true;
+      _detectedTitle = 'Menganalisis...';
+      _detectedResult = 'CCTV Pintar AI sedang memproses gambarmu. Tunggu bentar ya...';
+    });
+
+    try {
+      // 1. Jepret Foto Asli (menimbulkan efek suara shutter bawaan HP/kamera)
+      // 1. Jepret Foto Asli
+      final imageFile = await _cameraController!.takePicture();
+      final bytes = await imageFile.readAsBytes();
+      final base64Image = base64Encode(bytes);
+
+      // 2. Kirim ke n8n Webhook
+      final response = await http.post(
+        Uri.parse(_n8nVisionWebhookUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer DELIRA_SECRET_KEY_2026', // Pengaman agar URL tak disalahgunakan
+        },
+        body: jsonEncode({
+          'prompt': 'Ini adalah aplikasi pemandu wisata Medan. Identifikasi tempat, bangunan, atau objek apa ini dalam 1 paragraf singkat (maksimal 3 kalimat) berbahasa Indonesia yang informatif dan ramah.',
+          'image_base64': base64Image,
+        }),
+      ).timeout(const Duration(seconds: 30)); // Timeout agak lama karena n8n butuh waktu memproses
+
+      // 3. Tampilkan Hasil dari n8n
+      if (response.statusCode == 200) {
+        // Asumsi n8n membalas dengan JSON: { "data": "Teks hasil AI..." } atau langsung string
+        // Kita parsing sesimpel mungkin. Sesuaikan dengan output n8n milik Senior
+        String resultText;
+        try {
+          final data = jsonDecode(response.body);
+          // Kalau n8n mengirim { "output": "teks" } atau { "result": "teks" }
+          resultText = data['output'] ?? data['result'] ?? data['data'] ?? data.toString();
+        } catch (_) {
+          // Kalau n8n cuma mengembalikan plain text
+          resultText = response.body;
+        }
+        
+        if (mounted) {
+          setState(() {
+            _detectedTitle = 'Hasil Pindai AI';
+            _detectedResult = resultText.trim();
+            _isProcessing = false;
+          });
+        }
+      } else {
+        throw Exception('Server n8n merespon dengan Status: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _detectedTitle = 'Pemindaian Gagal';
+          _detectedResult = '$e';
+          _isProcessing = false;
+        });
+      }
+      debugPrint('SCAN ERROR: $e');
+    }
+  }
+
+  // >>> FUNGI BARU UNTUK PILIH DARI GALERI <<<
+  Future<void> _pickImageAndAnalyze() async {
+    if (_isProcessing) return;
+
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? imageFile = await picker.pickImage(source: ImageSource.gallery);
+      
+      if (imageFile == null) return; // Batal pilih foto
+
+      setState(() {
+        _isProcessing = true;
+        _detectedTitle = 'Menganalisis Galeri...';
+        _detectedResult = 'Sedang mengirim foto dari memori ke n8n AI. Tunggu sejenak ya...';
+      });
+
+      final bytes = await imageFile.readAsBytes();
+      final base64Image = base64Encode(bytes);
+
+      // Kirim ke n8n Webhook Vision
+      final response = await http.post(
+        Uri.parse(_n8nVisionWebhookUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer DELIRA_SECRET_KEY_2026',
+        },
+        body: jsonEncode({
+          'prompt': 'Ini adalah aplikasi pemandu wisata Medan. Identifikasi tempat, bangunan, atau objek apa ini dalam 1 paragraf singkat (maksimal 3 kalimat) berbahasa Indonesia yang informatif dan ramah.',
+          'image_base64': base64Image,
+        }),
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        String resultText;
+        try {
+          final data = jsonDecode(response.body);
+          resultText = data['output'] ?? data['result'] ?? data['data'] ?? data.toString();
+        } catch (_) {
+          resultText = response.body;
+        }
+        
+        if (mounted) {
+          setState(() {
+            _detectedTitle = 'Hasil Pindai AI (Galeri)';
+            _detectedResult = resultText.trim();
+            _isProcessing = false;
+          });
+        }
+      } else {
+        throw Exception('Server n8n merespon dengan Status: ${response.statusCode}');
+      }
+
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _detectedTitle = 'Pemindaian Gagal';
+          _detectedResult = 'Hubungkan jaringan. Output: $e';
+          _isProcessing = false;
+        });
+        
+        // Error Handling Tambahan via Snackbar agar User lebih jelas
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal mengirim gambar: $e', style: const TextStyle(color: Colors.white)),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _sendMessage(String text) async {
@@ -124,31 +304,32 @@ class _AIGuidePageState extends State<AIGuidePage> {
       return;
     }
 
-    // Step 2: Try Gemini API
+    // Step 2: Try n8n Chat Webhook
     try {
       final response = await http.post(
-        Uri.parse('$_geminiUrl?key=$_geminiApiKey'),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse(_n8nChatWebhookUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer DELIRA_SECRET_KEY_2026', // Pengaman agar URL tak disalahgunakan
+        },
         body: jsonEncode({
-          'contents': [
-            {
-              'role': 'user',
-              'parts': [{'text': 'Kamu adalah MedanBot asisten wisata Medan. Jawab singkat dalam Bahasa Indonesia dengan emoji. Pertanyaan: $text'}]
-            }
-          ],
-          'generationConfig': {
-            'temperature': 0.7,
-            'maxOutputTokens': 300,
-          }
+          'prompt': text,
+          'context': 'Kamu adalah MedanBot asisten wisata Medan. Jawab ramah dan informatif.',
         }),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 15)); // Toleransi server n8n
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final botReply = data['candidates'][0]['content']['parts'][0]['text'] as String;
+        String botReply;
+        try {
+          final data = jsonDecode(response.body);
+          botReply = data['output'] ?? data['result'] ?? data['data'] ?? data.toString();
+        } catch (_) {
+          botReply = response.body;
+        }
+
         if (!mounted) return;
         setState(() {
-          _messages.add({'role': 'bot', 'text': botReply});
+          _messages.add({'role': 'bot', 'text': botReply.trim()});
           _isTyping = false;
         });
         _scrollToBottom();
@@ -195,19 +376,33 @@ class _AIGuidePageState extends State<AIGuidePage> {
 
   @override
   void dispose() {
+    _cameraController?.dispose();
+    _animationController.dispose();
+    _textController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      body: SafeArea(
-        child: Column(
-          children: [
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.dark,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Scaffold(
+        resizeToAvoidBottomInset: true,
+        body: SafeArea(
+          top: false, // Edge-to-Edge
+          child: Column(
+            children: [
             // Tab bar
             Container(
               color: Colors.white,
+              padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
               child: Row(
                 children: [
                   if (widget.onBackPressed != null)
@@ -288,20 +483,31 @@ class _AIGuidePageState extends State<AIGuidePage> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildScanARView() {
     return SingleChildScrollView(
       child: Column(
         children: [
-          // Camera View Simulation Box
+          // Camera View Box
           Stack(
             children: [
               Container(
                 width: double.infinity,
                 height: 480,
                 color: const Color(0xFF0F2E23),
+                child: _isCameraInitialized && _cameraController != null
+                    ? ClipRect(
+                        child: AspectRatio( // Ensure preview doesn't distort
+                          aspectRatio: _cameraController!.value.aspectRatio,
+                          child: CameraPreview(_cameraController!),
+                        ),
+                      )
+                    : const Center(
+                        child: CircularProgressIndicator(color: AppColors.primary),
+                      ),
               ),
 
               // Mode Badge (Top Left inside camera)
@@ -351,21 +557,29 @@ class _AIGuidePageState extends State<AIGuidePage> {
                         _buildCorner(Alignment.bottomLeft),
                         _buildCorner(Alignment.bottomRight),
 
-                        // Scanning Line
+                        // Animated Scanning Line
                         Center(
-                          child: Container(
-                            height: 2,
-                            width: 220,
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withAlpha(200),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.primary.withAlpha(120),
-                                  blurRadius: 10,
-                                  spreadRadius: 2,
+                          child: AnimatedBuilder(
+                            animation: _scanAnimation,
+                            builder: (context, child) {
+                              return Transform.translate(
+                                offset: Offset(0, _scanAnimation.value),
+                                child: Container(
+                                  height: 2,
+                                  width: 220,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withAlpha(200),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: AppColors.primary.withAlpha(120),
+                                        blurRadius: 10,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ],
-                            ),
+                              );
+                            },
                           ),
                         ),
                       ],
@@ -390,23 +604,26 @@ class _AIGuidePageState extends State<AIGuidePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text(
-                        'Masjid Raya Al-Mashun',
-                        style: TextStyle(
+                      Text(
+                        _detectedTitle,
+                        style: const TextStyle(
                           color: AppColors.primary,
                           fontWeight: FontWeight.bold,
                           fontSize: 18,
                         ),
                       ),
                       const SizedBox(height: 12),
-                      const Text(
-                        'Masjid bersejarah yang dibangun tahun 1906 dengan arsitektur perpaduan Timur Tengah dan Eropa.',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          height: 1.5,
+                      if (_isProcessing)
+                        const LinearProgressIndicator(color: AppColors.primary)
+                      else
+                        Text(
+                          _detectedResult,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            height: 1.5,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -421,39 +638,65 @@ class _AIGuidePageState extends State<AIGuidePage> {
 
           const SizedBox(height: 32),
 
-          // Capture Button
-          GestureDetector(
-            onTap: () {},
-            child: Container(
-              width: 76,
-              height: 76,
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 4),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withAlpha(30),
-                    blurRadius: 15,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Center(
+          // >>> iOS Camera Style Buttons <<<
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Gallery Button (Kiri) - Tampil murni ikon tanpa latar belakang
+              GestureDetector(
+                onTap: _pickImageAndAnalyze,
                 child: Container(
-                  width: 58,
-                  height: 58,
+                  width: 50,
+                  height: 50,
+                  color: Colors.transparent, // Area sentuh biar gampang dipencet
+                  child: const Icon(
+                    Icons.image_outlined,
+                    color: AppColors.primary,
+                    size: 32, // Ukuran ikon dinaikkan sedikit
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 40), // Jarak antara
+
+              // Capture Button (Jepret Langsung - Center, Ukuran persis iOS)
+              GestureDetector(
+                onTap: _captureAndAnalyzeImage,
+                child: Container(
+                  width: 68,  // Diperkecil agar lebih elegan
+                  height: 68,
+                  // Padding ini memberi efek jarak transparan tipis ala iOS
+                  padding: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
-                    color: Colors.transparent,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: Colors.black.withAlpha(20),
-                      width: 1,
+                      color: AppColors.primary.withAlpha(120), 
+                      width: 2, // Cincin luar dibuat lebih tipis (Light)
+                    ),
+                  ),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    decoration: BoxDecoration(
+                      color: _isProcessing ? Colors.grey.shade300 : AppColors.primary,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        if (!_isProcessing)
+                          BoxShadow(
+                            color: AppColors.primary.withAlpha(60),
+                            blurRadius: 8,
+                            spreadRadius: 1,
+                          )
+                      ],
                     ),
                   ),
                 ),
               ),
-            ),
+
+              const SizedBox(width: 40), // Jarak penyeimbang
+
+              // Spacer tak kasat mata (Kanan) agar tombol Jepret tidak miring posisinya
+              const SizedBox(width: 50, height: 50),
+            ],
           ),
 
           const SizedBox(height: 20),
@@ -589,48 +832,50 @@ class _AIGuidePageState extends State<AIGuidePage> {
                 ),
               ),
               // Input field
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _textController,
-                        minLines: 1,
-                        maxLines: 3,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: _sendMessage,
-                        decoration: InputDecoration(
-                          hintText: 'Tanyakan sesuatu...',
-                          hintStyle: TextStyle(color: Colors.grey[400]),
-                          filled: true,
-                          fillColor: const Color(0xFFF5F5F5),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(24),
-                            borderSide: BorderSide.none,
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _textController,
+                          minLines: 1,
+                          maxLines: 3,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: _sendMessage,
+                          decoration: InputDecoration(
+                            hintText: 'Tanyakan sesuatu...',
+                            hintStyle: TextStyle(color: Colors.grey[400]),
+                            filled: true,
+                            fillColor: const Color(0xFFF5F5F5),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(24),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 10),
+                            isDense: true,
                           ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
-                          isDense: true,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () => _sendMessage(_textController.text),
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1A6B4A),
-                          borderRadius: BorderRadius.circular(12),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => _sendMessage(_textController.text),
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1A6B4A),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.send_rounded,
+                            color: Colors.white, size: 20),
                         ),
-                        child: const Icon(Icons.send_rounded,
-                          color: Colors.white, size: 20),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -705,5 +950,4 @@ class _AIGuidePageState extends State<AIGuidePage> {
       ),
     );
   }
-
 }
