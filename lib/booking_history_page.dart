@@ -125,7 +125,7 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: bookings.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              separatorBuilder: (_, _) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 final b = bookings[index];
                 final status = b['status']?.toString().toLowerCase() ?? 'pending';
@@ -178,7 +178,7 @@ class _BookingHistoryPageState extends State<BookingHistoryPage> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: statusColor.withOpacity(0.1),
+                                color: statusColor.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(

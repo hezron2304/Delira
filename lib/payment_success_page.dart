@@ -258,19 +258,26 @@ class PaymentSuccessPage extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 10,
                       spreadRadius: 2,
                     ),
                   ],
                 ),
                 child: Center(
-                  child: QrImageView(
-                    data: orderId,
-                    version: QrVersions.auto,
-                    size: 80.0,
-                    foregroundColor: AppColors.primaryDark,
-                  ),
+                    child: QrImageView(
+                      data: orderId,
+                      version: QrVersions.auto,
+                      size: 80.0,
+                      eyeStyle: const QrEyeStyle(
+                        eyeShape: QrEyeShape.square,
+                        color: AppColors.primaryDark,
+                      ),
+                      dataModuleStyle: const QrDataModuleStyle(
+                        dataModuleShape: QrDataModuleShape.square,
+                        color: AppColors.primaryDark,
+                      ),
+                    ),
                 ),
               ),
               const SizedBox(height: 12),

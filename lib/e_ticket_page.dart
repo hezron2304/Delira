@@ -107,7 +107,7 @@ class _ETicketPageState extends State<ETicketPage> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
-                      BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15, spreadRadius: 5),
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 15, spreadRadius: 5),
                     ],
                   ),
                   child: Column(
@@ -123,7 +123,14 @@ class _ETicketPageState extends State<ETicketPage> {
                         data: widget.orderId,
                         version: QrVersions.auto,
                         size: 180.0,
-                        foregroundColor: AppColors.primaryDark,
+                        eyeStyle: const QrEyeStyle(
+                          eyeShape: QrEyeShape.square,
+                          color: AppColors.primaryDark,
+                        ),
+                        dataModuleStyle: const QrDataModuleStyle(
+                          dataModuleShape: QrDataModuleShape.square,
+                          color: AppColors.primaryDark,
+                        ),
                       ),
                       const SizedBox(height: 24),
                       

@@ -188,7 +188,7 @@ class _HotelPageState extends State<HotelPage> {
         }
       }
     } catch (e) {
-      print('FETCH ERROR: $e');
+      debugPrint('FETCH ERROR: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -260,7 +260,7 @@ class _HotelPageState extends State<HotelPage> {
                   borderRadius: BorderRadius.circular(40),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),

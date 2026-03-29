@@ -332,7 +332,7 @@ class _RoomSelectionPageState extends State<RoomSelectionPage> {
                       height: 120,
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      errorBuilder: (_, _, _) => Container(
                         height: 120,
                         color: AppColors.surface,
                         child: const Center(

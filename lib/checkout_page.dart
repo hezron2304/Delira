@@ -145,10 +145,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
       'catatan': _specialRequestController.text.trim(),
     };
 
-    print("--- [DEEP TRACE: PAYLOAD AUDIT] ---");
-    print("Payload: ${jsonEncode(payload)}");
-    print("Session JWT valid? ${session.accessToken.isNotEmpty}");
-    print("Role: ${user.role}");
+    debugPrint("--- [DEEP TRACE: PAYLOAD AUDIT] ---");
+    debugPrint("Payload: ${jsonEncode(payload)}");
+    debugPrint("Session JWT valid? ${session.accessToken.isNotEmpty}");
+    debugPrint("Role: ${user.role}");
 
     try {
       await Supabase.instance.client.schema('public').from('booking').insert(payload);
@@ -156,18 +156,18 @@ class _CheckoutPageState extends State<CheckoutPage> {
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      print("--- [DEEP TRACE: ERROR HANDLING] ---");
+      debugPrint("--- [DEEP TRACE: ERROR HANDLING] ---");
       if (e is PostgrestException) {
-        print("PostgrestException Code: ${e.code}");
-        print("PostgrestException Message: ${e.message}");
-        print("PostgrestException Details: ${e.details}");
-        print("PostgrestException Hint: ${e.hint}");
+        debugPrint("PostgrestException Code: ${e.code}");
+        debugPrint("PostgrestException Message: ${e.message}");
+        debugPrint("PostgrestException Details: ${e.details}");
+        debugPrint("PostgrestException Hint: ${e.hint}");
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('DB Error [${e.code}]: ${e.message}')),
         );
       } else {
-        print("Unknown Exception: $e");
+        debugPrint("Unknown Exception: $e");
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e')),
         );
@@ -546,7 +546,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 secondary: Icon(opt['ic'] as IconData, color: opt['c'] as Color, size: 28),
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );

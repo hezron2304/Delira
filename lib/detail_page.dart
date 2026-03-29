@@ -28,6 +28,13 @@ class _DetailPageState extends State<DetailPage> {
   bool _isFavorited = false;
   bool _isLoadingGallery = false;
   String? _galleryError;
+  bool _isDescriptionExpanded = false;
+  List<Map<String, dynamic>> _ulasanList = [];
+  bool _isLoadingUlasan = true;
+  String? _ulasanError;
+  final TextEditingController _ulasanController = TextEditingController();
+  int _selectedRating = 5;
+  bool _isSubmittingUlasan = false;
 
   @override
   void initState() {
@@ -35,6 +42,7 @@ class _DetailPageState extends State<DetailPage> {
     _fetchLocation();
     _fetchGallery();
     _fetchFavoriteStatus();
+    _fetchUlasan();
     _scrollController.addListener(_onScroll);
   }
 
@@ -75,13 +83,13 @@ class _DetailPageState extends State<DetailPage> {
           _isLoadingGallery = false;
           
           if (_galleryImages.isEmpty) {
-            print('LOG: Gallery is empty for ID: ${destinasi.id}');
-            print('LOG: Main fotoUtamaUrl fallback = ${destinasi.fotoUtamaUrl}');
+            debugPrint('LOG: Gallery is empty for ID: ${destinasi.id}');
+            debugPrint('LOG: Main fotoUtamaUrl fallback = ${destinasi.fotoUtamaUrl}');
           }
         });
       }
     } catch (e) {
-      print('DB_ERROR: $e');
+      debugPrint('DB_ERROR: $e');
       if (mounted) {
         setState(() {
           _galleryError = e.toString();
@@ -100,6 +108,7 @@ class _DetailPageState extends State<DetailPage> {
   Future<void> _fetchLocation() async {
     final pos = await LocationUtils.getCurrentPosition();
     if (mounted) {
+      debugPrint('LOG: Destinasi Deskripsi Length: ${destinasi.deskripsi.length}');
       setState(() {
         _currentPosition = pos;
       });
@@ -176,7 +185,7 @@ class _DetailPageState extends State<DetailPage> {
       }
     } catch (e) {
       debugPrint('Error toggling favorite: $e');
-      print('Database Error Details: $e');
+      debugPrint('Database Error Details: $e');
       if (mounted) {
         setState(() {
           _isFavorited = wasFavorited;
@@ -235,6 +244,10 @@ class _DetailPageState extends State<DetailPage> {
                   const SizedBox(height: 24),
                   _buildGallerySection(),
                   const SizedBox(height: 24),
+                  const Divider(),
+                  const SizedBox(height: 24),
+                  _buildLocationSection(),
+                  const SizedBox(height: 32),
                   _buildReviewsSection(),
                   const SizedBox(height: 120), // Bottom bar space
                 ],
@@ -276,8 +289,8 @@ class _DetailPageState extends State<DetailPage> {
       }
     }
 
-    print('DEBUG_URL: ${destinasi.fotoUtamaUrl}');
-    print('DEBUG: Final allImages List = $allImages');
+    debugPrint('DEBUG_URL: ${destinasi.fotoUtamaUrl}');
+    debugPrint('DEBUG: Final allImages List = $allImages');
 
     return SliverAppBar(
       pinned: true,
@@ -445,7 +458,7 @@ class _DetailPageState extends State<DetailPage> {
                 );
               },
               errorBuilder: (context, error, stackTrace) {
-                print('LOG: Render Error for URL: $imageUrl, Error: $error');
+                debugPrint('LOG: Render Error for URL: $imageUrl, Error: $error');
                 return Container(
                   color: Colors.grey[200],
                   child: Column(
@@ -560,12 +573,6 @@ class _DetailPageState extends State<DetailPage> {
           Colors.green,
         ),
         _buildStatBox(
-          Icons.payments_outlined,
-          destinasi.formattedPrice,
-          'Tiket',
-          Colors.teal,
-        ),
-        _buildStatBox(
           Icons.history,
           '1906',
           'Tahun',
@@ -582,7 +589,7 @@ class _DetailPageState extends State<DetailPage> {
     Color iconColor,
   ) {
     return Container(
-      width: 78,
+      width: 100,
       padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -594,14 +601,14 @@ class _DetailPageState extends State<DetailPage> {
           const SizedBox(height: 8),
           Text(
             value,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 4),
           Text(
             label,
             style: const TextStyle(
-              fontSize: 11,
+              fontSize: 12,
               color: AppColors.textSecondary,
             ),
             textAlign: TextAlign.center,
@@ -612,6 +619,14 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   Widget _buildDescriptionSection() {
+    final bool hasDeskripsi = destinasi.deskripsi.trim().isNotEmpty;
+    final String deskripsiText = hasDeskripsi 
+        ? destinasi.deskripsi 
+        : 'Informasi deskripsi belum tersedia untuk ${destinasi.nama}.';
+    
+    // Tampilkan tombol hanya jika teks cukup panjang (estimasi > 160 karakter untuk 4 baris)
+    final bool isTextLong = destinasi.deskripsi.length > 160;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -620,18 +635,33 @@ class _DetailPageState extends State<DetailPage> {
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
-        Text(
-          '${destinasi.nama} adalah tempat bersejarah yang sangat indah dan ikonik di Kota Medan. Merupakan perpaduan arsitektur yang megah dan memiliki nilai budaya tinggi.',
-          style: const TextStyle(color: AppColors.textSecondary, height: 1.6),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Baca selengkapnya',
-          style: TextStyle(
-            color: AppColors.primary,
-            fontWeight: FontWeight.bold,
+        AnimatedSize(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          child: Text(
+            deskripsiText,
+            style: const TextStyle(color: AppColors.textSecondary, height: 1.6),
+            maxLines: _isDescriptionExpanded ? null : 4,
+            overflow: _isDescriptionExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
           ),
         ),
+        if (hasDeskripsi && isTextLong) ...[
+          const SizedBox(height: 8),
+          InkWell(
+            onTap: () {
+              setState(() {
+                _isDescriptionExpanded = !_isDescriptionExpanded;
+              });
+            },
+            child: Text(
+              _isDescriptionExpanded ? 'Tutup' : 'Baca selengkapnya',
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -641,62 +671,110 @@ class _DetailPageState extends State<DetailPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Info Kunjungan',
+          'Informasi',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
-        _buildInfoRow(
-          Icons.access_time,
-          'Jam Operasional',
-          'Setiap Hari: ${destinasi.jamBuka} - ${destinasi.jamTutup}',
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            children: [
+              _buildInfoRow(
+                Icons.access_time,
+                'Jam Operasional',
+                'Setiap Hari: ${destinasi.jamBuka} - ${destinasi.jamTutup}',
+              ),
+              const Divider(height: 32),
+              _buildInfoRow(
+                Icons.payments_outlined,
+                'Tiket Masuk',
+                destinasi.formattedPrice,
+              ),
+              const Divider(height: 32),
+              _buildInfoRow(
+                Icons.checkroom,
+                'Dress Code',
+                'Berpakaian sopan dan menutup aurat',
+              ),
+              const Divider(height: 32),
+              _buildInfoRow(
+                Icons.location_on_outlined,
+                'Alamat',
+                'Jl. Sisingamangaraja, Medan Kota, Medan',
+                showAction: true,
+                onTap: _launchNavigation,
+              ),
+              const Divider(height: 32),
+              _buildInfoRow(
+                Icons.phone_outlined,
+                'Kontak',
+                '+62 61 4514441',
+              ),
+            ],
+          ),
         ),
-        _buildInfoRow(Icons.attach_money, 'Tiket Masuk', destinasi.formattedPrice),
-        _buildInfoRow(
-          Icons.checkroom,
-          'Dress Code',
-          'Berpakaian sopan dan menutup aurat',
-        ),
-        _buildInfoRow(
-          Icons.location_on_outlined,
-          'Alamat',
-          'Jl. Sisingamangaraja, Medan Kota, Medan',
-        ),
-        _buildInfoRow(Icons.phone_outlined, 'Kontak', '+62 61 4514441'),
       ],
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String title, String subtitle) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: AppColors.primary, size: 24),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
+  Widget _buildInfoRow(IconData icon, String title, String subtitle, {bool showAction = false, VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: AppColors.primary, size: 24),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      if (showAction)
+                        Row(
+                          children: [
+                            Text(
+                              'Buka Peta',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right, color: AppColors.primary, size: 14),
+                          ],
+                        ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 14,
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -744,6 +822,36 @@ class _DetailPageState extends State<DetailPage> {
     );
   }
 
+  Future<void> _fetchUlasan() async {
+    setState(() {
+      _isLoadingUlasan = true;
+      _ulasanError = null;
+    });
+
+    try {
+      final res = await Supabase.instance.client
+          .from('ulasan')
+          .select('*, profiles(nama_lengkap)')
+          .eq('destinasi_id', destinasi.id ?? '')
+          .order('created_at', ascending: false);
+
+      if (mounted) {
+        setState(() {
+          _ulasanList = List<Map<String, dynamic>>.from(res);
+          _isLoadingUlasan = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('FETCH_ULASAN_ERROR: $e');
+      if (mounted) {
+        setState(() {
+          _ulasanError = 'Gagal memuat ulasan.';
+          _isLoadingUlasan = false;
+        });
+      }
+    }
+  }
+
   Future<void> _launchNavigation() async {
     final url = Uri.parse(
       'https://www.google.com/maps/search/?api=1&query=${destinasi.latitude},${destinasi.longitude}'
@@ -759,6 +867,80 @@ class _DetailPageState extends State<DetailPage> {
     }
   }
 
+  Widget _buildLocationSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Lokasi',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 16),
+        GestureDetector(
+          onTap: _launchNavigation,
+          child: Container(
+            height: 180,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Stack(
+              children: [
+                // Grid Dummy Background
+                CustomPaint(painter: _GridPainter(), size: Size.infinite),
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 10,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.location_on,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                      ),
+                      Container(width: 4, height: 16, color: AppColors.primary),
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: const BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Ketuk untuk buka peta',
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildReviewsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -768,14 +950,198 @@ class _DetailPageState extends State<DetailPage> {
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
-        _buildReviewCard('Ahmad Rizki'),
-        const SizedBox(height: 12),
-        _buildReviewCard('Siti Aminah'),
+        _buildAddReviewSection(),
+        const SizedBox(height: 24),
+        if (_isLoadingUlasan)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20.0),
+              child: CircularProgressIndicator(color: AppColors.primary),
+            ),
+          )
+        else if (_ulasanError != null)
+          Center(
+            child: Column(
+              children: [
+                Text(_ulasanError!, style: const TextStyle(color: Colors.red)),
+                TextButton(
+                  onPressed: _fetchUlasan,
+                  child: const Text('Coba Lagi'),
+                ),
+              ],
+            ),
+          )
+        else if (_ulasanList.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Center(
+              child: Column(
+                children: [
+                  Icon(Icons.rate_review_outlined, size: 48, color: Colors.grey),
+                  SizedBox(height: 12),
+                  Text(
+                    'Belum ada ulasan untuk tempat ini.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ListView.separated(
+            padding: EdgeInsets.zero,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _ulasanList.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) => _buildReviewCard(_ulasanList[index]),
+          ),
       ],
     );
   }
 
-  Widget _buildReviewCard(String name) {
+  Widget _buildAddReviewSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Rating Kamu',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              const SizedBox(width: 12),
+              Row(
+                children: List.generate(5, (index) {
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedRating = index + 1;
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                      child: Icon(
+                        index < _selectedRating ? Icons.star : Icons.star_border,
+                        color: Colors.orange,
+                        size: 28,
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _ulasanController,
+            maxLines: 3,
+            decoration: InputDecoration(
+              hintText: 'Tulis ulasan kamu di sini...',
+              hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.all(12),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isSubmittingUlasan ? null : _submitUlasan,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                elevation: 0,
+              ),
+              child: _isSubmittingUlasan
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Text('Kirim Ulasan', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _submitUlasan() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Silakan login terlebih dahulu untuk memberikan ulasan.')),
+      );
+      return;
+    }
+
+    final comment = _ulasanController.text.trim();
+    if (comment.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ulasan tidak boleh kosong.')),
+      );
+      return;
+    }
+
+    setState(() => _isSubmittingUlasan = true);
+
+    try {
+      await Supabase.instance.client.from('ulasan').insert({
+        'user_id': user.id,
+        'destinasi_id': destinasi.id,
+        'rating': _selectedRating,
+        'ulasan': comment,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      if (mounted) {
+        _ulasanController.clear();
+        setState(() {
+          _selectedRating = 5;
+          _isSubmittingUlasan = false;
+        });
+        _fetchUlasan(); // Refresh list
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ulasan berhasil dikirim!')),
+        );
+      }
+    } catch (e) {
+      debugPrint('SUBMIT_ULASAN_ERROR: $e');
+      if (mounted) {
+        setState(() => _isSubmittingUlasan = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mengirim ulasan: $e')),
+        );
+      }
+    }
+  }
+
+  Widget _buildReviewCard(Map<String, dynamic> ulasanData) {
+    final profiles = ulasanData['profiles'] as Map<String, dynamic>?;
+    final String name = profiles?['nama_lengkap']?.toString() ?? 'Pengguna Delira';
+    final String comment = ulasanData['ulasan']?.toString() ?? '-';
+    final int rating = (ulasanData['rating'] as num?)?.toInt() ?? 5;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -787,12 +1153,12 @@ class _DetailPageState extends State<DetailPage> {
         children: [
           Row(
             children: [
-              const CircleAvatar(
+              CircleAvatar(
                 radius: 18,
                 backgroundColor: AppColors.primary,
                 child: Text(
-                  'A',
-                  style: TextStyle(color: Colors.white, fontSize: 12),
+                  name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
                 ),
               ),
               const SizedBox(width: 12),
@@ -807,9 +1173,9 @@ class _DetailPageState extends State<DetailPage> {
                   Row(
                     children: List.generate(
                       5,
-                      (i) => const Icon(
+                      (i) => Icon(
                         Icons.star,
-                        color: Colors.orange,
+                        color: i < rating ? Colors.orange : Colors.grey.shade300,
                         size: 14,
                       ),
                     ),
@@ -819,9 +1185,9 @@ class _DetailPageState extends State<DetailPage> {
             ],
           ),
           const SizedBox(height: 12),
-          const Text(
-            'Tempat yang sangat indah dan bersejarah. Arsitekturnya luar biasa!',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          Text(
+            comment,
+            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
           ),
         ],
       ),
@@ -959,4 +1325,26 @@ class _DetailPageState extends State<DetailPage> {
       ),
     );
   }
+}
+
+class _GridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.border.withValues(alpha: 0.3)
+      ..strokeWidth = 1.0;
+
+    const double step = 30.0;
+
+    for (double i = step; i < size.width; i += step) {
+      canvas.drawLine(Offset(i, 0), Offset(i, size.height), paint);
+    }
+
+    for (double i = step; i < size.height; i += step) {
+      canvas.drawLine(Offset(0, i), Offset(size.width, i), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

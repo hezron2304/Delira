@@ -25,6 +25,13 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   bool _isAppBarCollapsed = false;
+  bool _isDescriptionExpanded = false;
+  List<Map<String, dynamic>> _ulasanList = [];
+  bool _isLoadingUlasan = true;
+  String? _ulasanError;
+  final TextEditingController _ulasanController = TextEditingController();
+  int _selectedRating = 5;
+  bool _isSubmittingUlasan = false;
 
   @override
   void initState() {
@@ -41,6 +48,7 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
     }
     _fetchFavoriteStatus();
     _fetchLocation();
+    _fetchUlasan();
     _scrollController.addListener(_onScroll);
   }
 
@@ -66,6 +74,8 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
   Future<void> _fetchLocation() async {
     final pos = await LocationUtils.getCurrentPosition();
     if (mounted) {
+      final deskripsi = hotel['deskripsi']?.toString() ?? '';
+      debugPrint('LOG: Hotel Deskripsi Length: ${deskripsi.length}');
       setState(() {
         _currentPosition = pos;
       });
@@ -89,6 +99,7 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } else {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Tidak dapat membuka aplikasi peta')),
       );
@@ -115,7 +126,7 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
         });
       }
     } catch (e) {
-      print('DB_ERROR: $e');
+      debugPrint('DB_ERROR: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -184,7 +195,7 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
       }
     } catch (e) {
       debugPrint('Error toggling favorite: $e');
-      print('DB_ERROR: $e');
+      debugPrint('DB_ERROR: $e');
       if (mounted) {
         setState(() {
           _isFavorited = wasFavorited;
@@ -221,6 +232,8 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
                       const SizedBox(height: 24),
                       _buildStatsRow(),
                       const SizedBox(height: 32),
+                      _buildDescriptionSection(),
+                      const SizedBox(height: 32),
                       _buildGallerySection(),
                       const SizedBox(height: 32),
                       _buildFacilitiesSection(),
@@ -228,6 +241,8 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
                       _buildInformationSection(),
                       const SizedBox(height: 32),
                       _buildLocationSection(),
+                      const SizedBox(height: 32),
+                      _buildReviewsSection(),
                       const SizedBox(height: 120),
                     ],
                   ),
@@ -372,7 +387,7 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
                     );
                   },
                   errorBuilder: (context, error, stackTrace) {
-                    print('LOG: Image loading failed for URL: $imageUrl, Error: $error');
+                    debugPrint('LOG: Image loading failed for URL: $imageUrl, Error: $error');
                     return Container(
                       color: Colors.grey[200],
                       child: Column(
@@ -512,6 +527,55 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
     );
   }
 
+  Widget _buildDescriptionSection() {
+    final String deskripsi = hotel['deskripsi']?.toString() ?? '';
+    final bool hasDeskripsi = deskripsi.trim().isNotEmpty;
+    final String deskripsiText = hasDeskripsi 
+        ? deskripsi 
+        : 'Informasi deskripsi belum tersedia untuk hotel ini.';
+    
+    // Tampilkan tombol hanya jika teks cukup panjang
+    final bool isTextLong = deskripsi.length > 160;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Deskripsi',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 12),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          child: Text(
+            deskripsiText,
+            style: const TextStyle(color: AppColors.textSecondary, height: 1.6),
+            maxLines: _isDescriptionExpanded ? null : 4,
+            overflow: _isDescriptionExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+          ),
+        ),
+        if (hasDeskripsi && isTextLong) ...[
+          const SizedBox(height: 8),
+          InkWell(
+            onTap: () {
+              setState(() {
+                _isDescriptionExpanded = !_isDescriptionExpanded;
+              });
+            },
+            child: Text(
+              _isDescriptionExpanded ? 'Tutup' : 'Baca selengkapnya',
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildGallerySection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -535,7 +599,7 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: _galeriList.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              separatorBuilder: (_, _) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
                 final fotoUrl =
                     _galeriList[index]['foto_url']?.toString() ?? '';
@@ -784,6 +848,289 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
         ),
       ],
     );
+  }
+
+  Widget _buildReviewsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Ulasan',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 16),
+        _buildAddReviewSection(),
+        const SizedBox(height: 24),
+        if (_isLoadingUlasan)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20.0),
+              child: CircularProgressIndicator(color: AppColors.primary),
+            ),
+          )
+        else if (_ulasanError != null)
+          Center(
+            child: Column(
+              children: [
+                Text(_ulasanError!, style: const TextStyle(color: Colors.red)),
+                TextButton(
+                  onPressed: _fetchUlasan,
+                  child: const Text('Coba Lagi'),
+                ),
+              ],
+            ),
+          )
+        else if (_ulasanList.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Center(
+              child: Column(
+                children: [
+                  Icon(Icons.rate_review_outlined, size: 48, color: Colors.grey),
+                  SizedBox(height: 12),
+                  Text(
+                    'Belum ada ulasan untuk penginapan ini.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ListView.separated(
+            padding: EdgeInsets.zero,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _ulasanList.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) => _buildReviewCard(_ulasanList[index]),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildAddReviewSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Rating Kamu',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              const SizedBox(width: 12),
+              Row(
+                children: List.generate(5, (index) {
+                  return GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedRating = index + 1;
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                      child: Icon(
+                        index < _selectedRating ? Icons.star : Icons.star_border,
+                        color: Colors.orange,
+                        size: 28,
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _ulasanController,
+            maxLines: 3,
+            decoration: InputDecoration(
+              hintText: 'Tulis ulasan kamu di sini...',
+              hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.all(12),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isSubmittingUlasan ? null : _submitUlasan,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                elevation: 0,
+              ),
+              child: _isSubmittingUlasan
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Text('Kirim Ulasan', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _submitUlasan() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Silakan login terlebih dahulu untuk memberikan ulasan.')),
+      );
+      return;
+    }
+
+    final comment = _ulasanController.text.trim();
+    if (comment.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ulasan tidak boleh kosong.')),
+      );
+      return;
+    }
+
+    setState(() => _isSubmittingUlasan = true);
+
+    try {
+      await Supabase.instance.client.from('ulasan').insert({
+        'user_id': user.id,
+        'hotel_id': hotel['id'],
+        'rating': _selectedRating,
+        'ulasan': comment,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      if (mounted) {
+        _ulasanController.clear();
+        setState(() {
+          _selectedRating = 5;
+          _isSubmittingUlasan = false;
+        });
+        _fetchUlasan(); // Refresh list
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ulasan berhasil dikirim!')),
+        );
+      }
+    } catch (e) {
+      debugPrint('SUBMIT_HOTEL_ULASAN_ERROR: $e');
+      if (mounted) {
+        setState(() => _isSubmittingUlasan = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mengirim ulasan: $e')),
+        );
+      }
+    }
+  }
+
+  Widget _buildReviewCard(Map<String, dynamic> ulasanData) {
+    final profiles = ulasanData['profiles'] as Map<String, dynamic>?;
+    final String name = profiles?['nama_lengkap']?.toString() ?? 'Pengguna Delira';
+    final String comment = ulasanData['ulasan']?.toString() ?? '-';
+    final int rating = (ulasanData['rating'] as num?)?.toInt() ?? 5;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: AppColors.primary,
+                child: Text(
+                  name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: List.generate(
+                      5,
+                      (i) => Icon(
+                        Icons.star,
+                        color: i < rating ? Colors.orange : Colors.grey.shade300,
+                        size: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            comment,
+            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _fetchUlasan() async {
+    setState(() {
+      _isLoadingUlasan = true;
+      _ulasanError = null;
+    });
+
+    try {
+      final res = await Supabase.instance.client
+          .from('ulasan')
+          .select('*, profiles(nama_lengkap)')
+          .eq('hotel_id', hotel['id']?.toString() ?? '')
+          .order('created_at', ascending: false);
+
+      if (mounted) {
+        setState(() {
+          _ulasanList = List<Map<String, dynamic>>.from(res);
+          _isLoadingUlasan = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('FETCH_HOTEL_ULASAN_ERROR: $e');
+      if (mounted) {
+        setState(() {
+          _ulasanError = 'Gagal memuat ulasan.';
+          _isLoadingUlasan = false;
+        });
+      }
+    }
   }
 
   Widget _buildBottomBookingBar(BuildContext context) {

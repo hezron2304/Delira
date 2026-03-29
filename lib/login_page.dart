@@ -85,7 +85,7 @@ class _LoginPageState extends State<LoginPage> {
           if (mounted) setState(() => _isLoading = false);
           return;
         }
-        print("Google Sign In Error: $error");
+        debugPrint("Google Sign In Error: $error");
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Error Google Sign In: $error')),
@@ -94,7 +94,7 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      final googleAuth = await googleUser.authentication;
+      final googleAuth = googleUser.authentication;
       if (googleAuth.idToken == null) {
         throw const AuthException('Tidak ada ID Token dari Google');
       }
