@@ -4,10 +4,14 @@ import 'package:delira/login_page.dart';
 import 'package:delira/home_page.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:delira/theme/app_colors.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Inisialisasi Environment Variables (API Key)
+  await dotenv.load(fileName: ".env");
 
   await Supabase.initialize(
     url: 'https://pdhvqcbnsncxkfspasjq.supabase.co',

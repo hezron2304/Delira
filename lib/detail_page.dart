@@ -40,11 +40,29 @@ class _DetailPageState extends State<DetailPage> {
   @override
   void initState() {
     super.initState();
+    _recordVisit();
     _fetchLocation();
     _fetchGallery();
     _fetchFavoriteStatus();
     _fetchUlasan();
     _scrollController.addListener(_onScroll);
+  }
+
+  Future<void> _recordVisit() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null || destinasi.id == null) return;
+
+      // Record this visit to history
+      await Supabase.instance.client.from('riwayat_kunjungan').insert({
+        'user_id': user.id,
+        'destinasi_id': destinasi.id!,
+        'nama_destinasi': destinasi.nama,
+        'waktu_kunjungan': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('DEBUG: Error recording visit: $e');
+    }
   }
 
   @override

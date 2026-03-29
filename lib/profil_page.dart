@@ -5,6 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:delira/login_page.dart';
 import 'package:delira/saved_hotels_page.dart';
 import 'package:delira/theme/app_colors.dart';
+import 'package:delira/history_page.dart';
+import 'package:delira/edit_profil_page.dart';
 
 class ProfilPage extends StatefulWidget {
   const ProfilPage({super.key});
@@ -16,11 +18,23 @@ class ProfilPage extends StatefulWidget {
 class _ProfilPageState extends State<ProfilPage> {
   bool _isSigningOut = false;
   int _savedCount = 0;
+  int _scanCount = 0;
+  int _visitCount = 0;
+  Map<String, dynamic>? _profileData;
 
   @override
   void initState() {
     super.initState();
-    _fetchSavedCount();
+    _fetchAllStats();
+  }
+
+  Future<void> _fetchAllStats() async {
+    await Future.wait([
+      _fetchSavedCount(),
+      _fetchScanCount(),
+      _fetchVisitCount(),
+      _fetchProfileData(),
+    ]);
   }
 
   Future<void> _fetchSavedCount() async {
@@ -43,13 +57,85 @@ class _ProfilPageState extends State<ProfilPage> {
     }
   }
 
+  Future<void> _fetchScanCount() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      final res = await Supabase.instance.client
+          .from('riwayat_scan')
+          .select('id')
+          .eq('user_id', user.id);
+      
+      if (mounted) {
+        setState(() {
+          _scanCount = res.length;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching scan count: $e');
+    }
+  }
+
+  Future<void> _fetchVisitCount() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      final res = await Supabase.instance.client
+          .from('riwayat_kunjungan')
+          .select('id')
+          .eq('user_id', user.id);
+      
+      if (mounted) {
+        setState(() {
+          _visitCount = res.length;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching visit count: $e');
+    }
+  }
+
+  Future<void> _fetchProfileData() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      final res = await Supabase.instance.client
+          .from('profiles')
+          .select()
+          .eq('id', user.id)
+          .maybeSingle();
+      
+      if (mounted && res != null) {
+        setState(() {
+          _profileData = res;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching profile data: $e');
+    }
+  }
+
   String get _userName {
+    if (_profileData != null && _profileData!['nama_lengkap'] != null) {
+      return _profileData!['nama_lengkap'];
+    }
     final meta = Supabase.instance.client.auth.currentUser?.userMetadata;
     return meta?['nama_lengkap'] as String? ?? 'Pengguna';
   }
 
   String get _userEmail {
     return Supabase.instance.client.auth.currentUser?.email ?? '';
+  }
+
+  String? get _avatarUrl {
+    if (_profileData != null && _profileData!['foto_url'] != null) {
+      return _profileData!['foto_url'];
+    }
+    final meta = Supabase.instance.client.auth.currentUser?.userMetadata;
+    return meta?['avatar_url'] as String?;
   }
 
   String get _initials {
@@ -89,6 +175,243 @@ class _ProfilPageState extends State<ProfilPage> {
     );
   }
 
+  void _showLanguagePicker() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Pilih Bahasa',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 20),
+              _buildLanguageOption('Bahasa Indonesia', true),
+              const SizedBox(height: 12),
+              _buildLanguageOption('English (Coming Soon)', false),
+              const SizedBox(height: 24),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLanguageOption(String label, bool isSelected) {
+    return InkWell(
+      onTap: isSelected ? () => Navigator.pop(context) : null,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primaryLight : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : Colors.grey.shade200,
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  color: isSelected ? AppColors.primary : Colors.grey,
+                ),
+              ),
+            ),
+            if (isSelected)
+              const Icon(Icons.check_circle, color: AppColors.primary, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAboutDelira() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+              ),
+              child: SingleChildScrollView(
+                controller: scrollController,
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade300,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withAlpha(60),
+                            blurRadius: 15,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(Icons.auto_awesome, color: Colors.white, size: 40),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Delira v1.0.0',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const Text(
+                      'Deli Rasa & Realitas',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Apa Itu Delira?',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Delira adalah asisten wisata cerdas pertama yang dirancang khusus untuk mengeksplorasi keindahan dan kekayaan budaya Kota Medan. Kami percaya bahwa setiap perjalanan haruslah bermakna, informatif, dan tak terlupakan.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                        height: 1.6,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    _buildFeatureInfo(
+                      Icons.camera_enhance_outlined,
+                      'AI Visual & AR',
+                      'Gunakan kamera Anda untuk memindai landmark bersejarah, kuliner khas, atau artefak budaya di Medan. AI kami akan mengidentifikasinya seketika dan memberikan informasi mendalam melalui Augmented Reality.',
+                    ),
+                    _buildFeatureInfo(
+                      Icons.chat_bubble_outline,
+                      'MedanBot Assistant',
+                      'Asisten chat pintar yang siap menjawab segala pertanyaan Anda tentang transportasi, rekomendasi hotel terbaik, hingga rute kuliner tersembunyi yang hanya diketahui warga lokal.',
+                    ),
+                    _buildFeatureInfo(
+                      Icons.hotel_outlined,
+                      'E-Booking Super Cepat',
+                      'Pesan hotel favorit Anda langsung melalui aplikasi dengan proses yang mulus, pembayaran yang aman, dan e-tiket yang selalu siap di saku Anda.',
+                    ),
+                    const SizedBox(height: 32),
+                    const Divider(),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Misi Kami',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Mempromosikan pariwisata Medan melalui inovasi teknologi tercanggih, memudahkan wisatawan lokal maupun mancanegara untuk merasakan "Deli Rasa" yang sesungguhnya di tanah Melayu Deli.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 48),
+                    const Text(
+                      '© 2024 Delira Team • Medan, Indonesia',
+                      style: TextStyle(fontSize: 11, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildFeatureInfo(IconData icon, String title, String description) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: AppColors.primary, size: 24),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -102,7 +425,17 @@ class _ProfilPageState extends State<ProfilPage> {
           // Aktivitas
           _buildSectionLabel('Aktivitas'),
           const SizedBox(height: 8),
-          _buildMenuItem(Icons.location_on_outlined, 'Riwayat Kunjungan'),
+          _buildMenuItem(
+            Icons.location_on_outlined, 
+            'Riwayat Kunjungan',
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const HistoryPage(type: HistoryType.visit)),
+              );
+              _fetchAllStats();
+            },
+          ),
           _buildMenuItem(
             Icons.favorite_border,
             'Tempat Tersimpan',
@@ -124,14 +457,29 @@ class _ProfilPageState extends State<ProfilPage> {
               );
             },
           ),
-          _buildMenuItem(Icons.document_scanner_outlined, 'Riwayat Scan AI'),
+          _buildMenuItem(
+            Icons.document_scanner_outlined, 
+            'Riwayat Scan AI',
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const HistoryPage(type: HistoryType.scan)),
+              );
+              _fetchAllStats();
+            },
+          ),
 
           const SizedBox(height: 16),
 
           // Pengaturan
           _buildSectionLabel('Pengaturan'),
           const SizedBox(height: 8),
-          _buildMenuItem(Icons.language, 'Bahasa', trailing: 'Bahasa Indonesia'),
+          _buildMenuItem(
+            Icons.language, 
+            'Bahasa', 
+            trailing: 'Bahasa Indonesia',
+            onTap: _showLanguagePicker,
+          ),
           _buildMenuItem(
             Icons.notifications_outlined,
             'Notifikasi',
@@ -143,7 +491,7 @@ class _ProfilPageState extends State<ProfilPage> {
             },
           ),
           _buildMenuItem(Icons.lock_outlined, 'Ubah Kata Sandi'),
-          _buildMenuItem(Icons.info_outlined, 'Tentang Delira'),
+          _buildMenuItem(Icons.info_outlined, 'Tentang Delira', onTap: _showAboutDelira),
 
           const SizedBox(height: 24),
           _buildSignOutButton(),
@@ -178,14 +526,17 @@ class _ProfilPageState extends State<ProfilPage> {
                   CircleAvatar(
                     radius: 34,
                     backgroundColor: Colors.white.withAlpha(60),
-                    child: Text(
-                      _initials,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    backgroundImage: _avatarUrl != null ? NetworkImage(_avatarUrl!) : null,
+                    child: _avatarUrl == null 
+                      ? Text(
+                          _initials,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      : null,
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -218,7 +569,15 @@ class _ProfilPageState extends State<ProfilPage> {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
-                  onPressed: _showComingSoon,
+                  onPressed: () async {
+                    final updated = await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const EditProfilPage()),
+                    );
+                    if (updated == true) {
+                      _fetchAllStats(); // Comprehensive refresh
+                    }
+                  },
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Colors.white, width: 1.5),
                     foregroundColor: Colors.white,
@@ -257,11 +616,11 @@ class _ProfilPageState extends State<ProfilPage> {
             ),
             child: Row(
               children: [
-                _buildStat('12', 'Dikunjungi'),
+                _buildStat(_visitCount.toString(), 'Dikunjungi'),
                 _buildVerticalDivider(),
                 _buildStat(_savedCount.toString(), 'Disimpan'),
                 _buildVerticalDivider(),
-                _buildStat('8', 'Scan AI'),
+                _buildStat(_scanCount.toString(), 'Scan AI'),
               ],
             ),
           ),
