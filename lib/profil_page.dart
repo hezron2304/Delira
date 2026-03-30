@@ -286,7 +286,13 @@ class _ProfilPageState extends State<ProfilPage> {
                           ),
                         ],
                       ),
-                      child: const Icon(Icons.auto_awesome, color: Colors.white, size: 40),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: Image.asset(
+                          'assets/images/delira_logo2.png',
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     const Text(

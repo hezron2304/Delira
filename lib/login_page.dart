@@ -170,10 +170,18 @@ class _LoginPageState extends State<LoginPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // Logo and App Name
-              const Row(
+              Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.explore, color: AppColors.primary, size: 32),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.asset(
+                      'assets/images/delira_logo2.png',
+                      height: 32,
+                      width: 32,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
                   SizedBox(width: 8),
                   Text(
                     'Delira',
