@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:delira/theme/app_colors.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:delira/change_password_page.dart';
 
 class EditProfilPage extends StatefulWidget {
   const EditProfilPage({super.key});
@@ -17,12 +18,10 @@ class _EditProfilPageState extends State<EditProfilPage> {
   late TextEditingController _namaController;
   late TextEditingController _phoneController;
   late TextEditingController _emailController;
-  late TextEditingController _passwordController;
   
   XFile? _pickedFile;
   String? _currentAvatarUrl;
   bool _isLoading = false;
-  bool _obscurePassword = true;
 
   @override
   void initState() {
@@ -33,7 +32,6 @@ class _EditProfilPageState extends State<EditProfilPage> {
     _namaController = TextEditingController(text: metadata?['nama_lengkap'] ?? '');
     _phoneController = TextEditingController(text: metadata?['nomor_hp'] ?? '');
     _emailController = TextEditingController(text: user?.email ?? '');
-    _passwordController = TextEditingController();
     _currentAvatarUrl = metadata?['avatar_url'] ?? metadata?['foto_url'];
   }
 
@@ -42,7 +40,6 @@ class _EditProfilPageState extends State<EditProfilPage> {
     _namaController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
@@ -129,15 +126,7 @@ class _EditProfilPageState extends State<EditProfilPage> {
         }
       }
 
-      // 4. Handle password change
-      if (_passwordController.text.isNotEmpty) {
-        if (_passwordController.text.length < 6) {
-          throw 'Kata sandi minimal 6 karakter';
-        }
-        await Supabase.instance.client.auth.updateUser(
-          UserAttributes(password: _passwordController.text),
-        );
-      }
+      // Password change logic moved to ChangePasswordPage
 
       // 5. Update profiles table
       await Supabase.instance.client
@@ -265,15 +254,44 @@ class _EditProfilPageState extends State<EditProfilPage> {
               ),
               const SizedBox(height: 20),
               const Divider(),
-              const SizedBox(height: 20),
-              _buildLabel('Kata Sandi Baru (Opsional)'),
-              TextFormField(
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                decoration: _buildInputDecoration('Isi untuk mengganti sandi', Icons.lock_outline).copyWith(
-                  suffixIcon: IconButton(
-                    icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+              const SizedBox(height: 16),
+              _buildLabel('Keamanan Akun'),
+              InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ChangePasswordPage()),
+                  );
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.lock_outline, color: AppColors.primary, size: 22),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Ubah Kata Sandi',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary),
+                            ),
+                            Text(
+                              'Klik di sini untuk memperbarui keamanan akun Anda',
+                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right, color: AppColors.primary, size: 20),
+                    ],
                   ),
                 ),
               ),
@@ -294,7 +312,7 @@ class _EditProfilPageState extends State<EditProfilPage> {
                       : const Text('Simpan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
               ),
-              const SizedBox(height: 60), // Menambahkan ruang di bawah agar tidak terpotong
+              SizedBox(height: MediaQuery.of(context).padding.bottom + 24),
             ],
           ),
         ),

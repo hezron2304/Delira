@@ -167,7 +167,7 @@ class _RoomSelectionPageState extends State<RoomSelectionPage> {
               itemBuilder: (context, index) =>
                   _buildRoomCard(_rooms[index]),
             ),
-            const SizedBox(height: 40),
+            SizedBox(height: MediaQuery.of(context).padding.bottom + 40),
           ],
         ),
       ),
@@ -766,7 +766,7 @@ class _DatePickerDialogState extends State<_DatePickerDialog> {
 
             // Bottom Summary + Button
             Container(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+              padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).padding.bottom + 20),
               decoration: BoxDecoration(
                 color: Colors.white,
                 boxShadow: [
@@ -978,7 +978,7 @@ class _GuestPickerDialogState extends State<_GuestPickerDialog> {
 
             // Bottom button
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+              padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(context).padding.bottom + 20),
               child: SizedBox(
                 height: 50,
                 child: ElevatedButton(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:ui';
 import 'package:delira/theme/app_colors.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:delira/utils/location_utils.dart';
@@ -241,49 +242,53 @@ class _DetailPageState extends State<DetailPage> {
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light, // Keep light for image header
-        systemNavigationBarColor: Colors.white, 
+        systemNavigationBarColor: Colors.transparent, // Make it transparent
         systemNavigationBarIconBrightness: Brightness.dark,
         systemNavigationBarContrastEnforced: false,
       ),
       child: Scaffold(
         backgroundColor: Colors.white,
-      body: CustomScrollView(
-        controller: _scrollController,
-        slivers: [
-          _buildSliverAppBar(context),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildTitleSection(),
-                  const SizedBox(height: 24),
-                  _buildStatsRow(),
-                  const SizedBox(height: 24),
-                  const Divider(),
-                  const SizedBox(height: 24),
-                  _buildDescriptionSection(),
-                  const SizedBox(height: 24),
-                  const Divider(),
-                  const SizedBox(height: 24),
-                  _buildVisitInfoSection(),
-                  const SizedBox(height: 24),
-                  _buildGallerySection(),
-                  const SizedBox(height: 24),
-                  const Divider(),
-                  const SizedBox(height: 24),
-                  _buildLocationSection(),
-                  const SizedBox(height: 32),
-                  _buildReviewsSection(),
-                  const SizedBox(height: 120), // Bottom bar space
-                ],
-              ),
+        body: Stack(
+          children: [
+            CustomScrollView(
+              controller: _scrollController,
+              slivers: [
+                _buildSliverAppBar(context),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildTitleSection(),
+                        const SizedBox(height: 24),
+                        _buildStatsRow(),
+                        const SizedBox(height: 24),
+                        const Divider(),
+                        const SizedBox(height: 24),
+                        _buildDescriptionSection(),
+                        const SizedBox(height: 24),
+                        const Divider(),
+                        const SizedBox(height: 24),
+                        _buildVisitInfoSection(),
+                        const SizedBox(height: 24),
+                        _buildGallerySection(),
+                        const SizedBox(height: 24),
+                        const Divider(),
+                        const SizedBox(height: 24),
+                        _buildLocationSection(),
+                        const SizedBox(height: 32),
+                        _buildReviewsSection(),
+                        const SizedBox(height: 100), // Ruang bawah agar tidak tertutup bar
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
-      bottomSheet: _buildBottomActionBar(context),
+            _buildBottomActionBar(context),
+          ],
+        ),
       ),
     );
   }
@@ -1223,22 +1228,29 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   Widget _buildBottomActionBar(BuildContext context) {
-    return SafeArea(
-      bottom: true,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 8,
-            offset: Offset(0, -2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
+    // Check if bottom padding exists (3-button nav or gestures)
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(200), // Slightly translucent white
+              border: Border(top: BorderSide(color: Colors.black.withAlpha(20))),
+            ),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                16, 
+                6, // Jarak nyaman sesuai preferensi di hotel detail
+                16, 
+                bottomPadding + 4, // Ruang aman bawah untuk navigasi sistem
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
           // AI Guide Button
           Expanded(
             flex: 1,
@@ -1352,10 +1364,13 @@ class _DetailPageState extends State<DetailPage> {
             ),
           ),
         ],
+              ),
+            ),
+          ),
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }
 
 class _GridPainter extends CustomPainter {

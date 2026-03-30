@@ -443,7 +443,7 @@ class _HotelPageState extends State<HotelPage> {
                     ),
                   ),
                 ),
-              const SizedBox(height: 80),
+              SizedBox(height: MediaQuery.of(context).padding.bottom + 100),
             ],
           ),
         ),

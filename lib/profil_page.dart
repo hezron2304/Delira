@@ -7,6 +7,7 @@ import 'package:delira/saved_hotels_page.dart';
 import 'package:delira/theme/app_colors.dart';
 import 'package:delira/history_page.dart';
 import 'package:delira/edit_profil_page.dart';
+import 'package:delira/change_password_page.dart';
 
 class ProfilPage extends StatefulWidget {
   const ProfilPage({super.key});
@@ -490,7 +491,16 @@ class _ProfilPageState extends State<ProfilPage> {
               );
             },
           ),
-          _buildMenuItem(Icons.lock_outlined, 'Ubah Kata Sandi'),
+          _buildMenuItem(
+            Icons.lock_outlined, 
+            'Ubah Kata Sandi',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ChangePasswordPage()),
+              );
+            },
+          ),
           _buildMenuItem(Icons.info_outlined, 'Tentang Delira', onTap: _showAboutDelira),
 
           const SizedBox(height: 24),

@@ -304,6 +304,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                 ],
               ),
+              SizedBox(height: MediaQuery.of(context).padding.bottom + 24),
             ],
           ),
         ),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'dart:ui';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:delira/room_selection_page.dart';
@@ -93,8 +95,9 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
       return;
     }
 
-    final url =
-        Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
+    final url = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+    );
 
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
@@ -130,7 +133,9 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Koneksi database gagal. Gagal memuat status favorit.'),
+            content: Text(
+              'Koneksi database gagal. Gagal memuat status favorit.',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -157,10 +162,7 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
       _isFavorited = !wasFavorited;
     });
 
-    final payload = {
-      'user_id': user.id,
-      'hotel_id': hotelId,
-    };
+    final payload = {'user_id': user.id, 'hotel_id': hotelId};
     debugPrint('Mengirim payload favorit: $payload');
 
     try {
@@ -212,46 +214,53 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          CustomScrollView(
-            controller: _scrollController,
-            slivers: [
-              _buildSliverAppBar(context),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildTitleSection(),
-                      const SizedBox(height: 16),
-                      _buildRatingRow(),
-                      const SizedBox(height: 24),
-                      _buildStatsRow(),
-                      const SizedBox(height: 32),
-                      _buildDescriptionSection(),
-                      const SizedBox(height: 32),
-                      _buildGallerySection(),
-                      const SizedBox(height: 32),
-                      _buildFacilitiesSection(),
-                      const SizedBox(height: 32),
-                      _buildInformationSection(),
-                      const SizedBox(height: 32),
-                      _buildLocationSection(),
-                      const SizedBox(height: 32),
-                      _buildReviewsSection(),
-                      const SizedBox(height: 120),
-                    ],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        systemNavigationBarColor: Colors.transparent, // Make it transparent
+        systemNavigationBarIconBrightness: Brightness.dark,
+        systemNavigationBarContrastEnforced: false,
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Stack(
+          children: [
+            CustomScrollView(
+              controller: _scrollController,
+              slivers: [
+                _buildSliverAppBar(context),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildTitleSection(),
+                        const SizedBox(height: 16),
+                        _buildRatingRow(),
+                        const SizedBox(height: 24),
+                        _buildStatsRow(),
+                        const SizedBox(height: 32),
+                        _buildDescriptionSection(),
+                        const SizedBox(height: 32),
+                        _buildGallerySection(),
+                        const SizedBox(height: 32),
+                        _buildFacilitiesSection(),
+                        const SizedBox(height: 32),
+                        _buildInformationSection(),
+                        const SizedBox(height: 32),
+                        _buildLocationSection(),
+                        const SizedBox(height: 32),
+                        _buildReviewsSection(),
+                        const SizedBox(height: 50),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          _buildBottomBookingBar(context),
-        ],
+              ],
+            ),
+            _buildBottomBookingBar(context),
+          ],
+        ),
       ),
     );
   }
@@ -259,9 +268,10 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
   Widget _buildSliverAppBar(BuildContext context) {
     // Collect all images (main + gallery)
     final List<String> allImages = [];
-    final mainImage = hotel['foto_utama_url'] ?? hotel['image_url'] ?? hotel['image'] ?? '';
+    final mainImage =
+        hotel['foto_utama_url'] ?? hotel['image_url'] ?? hotel['image'] ?? '';
     if (mainImage.isNotEmpty) allImages.add(mainImage);
-    
+
     for (var item in _galeriList) {
       final url = item['foto_url']?.toString() ?? '';
       if (url.isNotEmpty && url != mainImage) {
@@ -278,10 +288,12 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
       leading: Padding(
         padding: const EdgeInsets.all(8.0),
         child: CircleAvatar(
-          backgroundColor: _isAppBarCollapsed ? Colors.transparent : Colors.black26,
+          backgroundColor: _isAppBarCollapsed
+              ? Colors.transparent
+              : Colors.black26,
           child: IconButton(
             icon: Icon(
-              Icons.arrow_back, 
+              Icons.arrow_back,
               color: _isAppBarCollapsed ? AppColors.textPrimary : Colors.white,
               size: 20,
             ),
@@ -305,13 +317,17 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
         Padding(
           padding: const EdgeInsets.all(8.0),
           child: CircleAvatar(
-            backgroundColor: _isAppBarCollapsed ? Colors.transparent : Colors.black26,
+            backgroundColor: _isAppBarCollapsed
+                ? Colors.transparent
+                : Colors.black26,
             child: IconButton(
               icon: Icon(
                 _isFavorited ? Icons.favorite : Icons.favorite_border,
-                color: _isFavorited 
-                    ? Colors.red 
-                    : (_isAppBarCollapsed ? AppColors.textPrimary : Colors.white),
+                color: _isFavorited
+                    ? Colors.red
+                    : (_isAppBarCollapsed
+                          ? AppColors.textPrimary
+                          : Colors.white),
                 size: 20,
               ),
               onPressed: _toggleFavorite,
@@ -321,11 +337,15 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
         Padding(
           padding: const EdgeInsets.only(top: 8, bottom: 8, right: 16),
           child: CircleAvatar(
-            backgroundColor: _isAppBarCollapsed ? Colors.transparent : Colors.black26,
+            backgroundColor: _isAppBarCollapsed
+                ? Colors.transparent
+                : Colors.black26,
             child: IconButton(
               icon: Icon(
-                Icons.share_outlined, 
-                color: _isAppBarCollapsed ? AppColors.textPrimary : Colors.white,
+                Icons.share_outlined,
+                color: _isAppBarCollapsed
+                    ? AppColors.textPrimary
+                    : Colors.white,
                 size: 20,
               ),
               onPressed: () {
@@ -337,9 +357,13 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
                       )
                     : '0';
                 final bintang = (hotel['bintang'] as num?)?.toInt() ?? 0;
-                final namaHotel = hotel['nama']?.toString() ?? hotel['name']?.toString() ?? 'Hotel';
+                final namaHotel =
+                    hotel['nama']?.toString() ??
+                    hotel['name']?.toString() ??
+                    'Hotel';
                 final slug = hotel['slug']?.toString() ?? '';
-                final shareText = 'Cek penginapan keren ini di Delira!\n\n'
+                final shareText =
+                    'Cek penginapan keren ini di Delira!\n\n'
                     '🏢 $namaHotel\n'
                     '⭐ Bintang $bintang\n'
                     '💸 Mulai dari Rp $formattedPrice / malam\n\n'
@@ -352,7 +376,7 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
           ),
         ),
       ],
-      shape: _isAppBarCollapsed 
+      shape: _isAppBarCollapsed
           ? const RoundedRectangleBorder(
               borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
             )
@@ -372,7 +396,7 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
               itemCount: allImages.length,
               itemBuilder: (context, index) {
                 final imageUrl = allImages[index];
-                
+
                 return Image.network(
                   imageUrl,
                   fit: BoxFit.cover,
@@ -381,19 +405,26 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
                     return Center(
                       child: CircularProgressIndicator(
                         value: loadingProgress.expectedTotalBytes != null
-                            ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
                             : null,
                       ),
                     );
                   },
                   errorBuilder: (context, error, stackTrace) {
-                    debugPrint('LOG: Image loading failed for URL: $imageUrl, Error: $error');
+                    debugPrint(
+                      'LOG: Image loading failed for URL: $imageUrl, Error: $error',
+                    );
                     return Container(
                       color: Colors.grey[200],
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: const [
-                          Icon(Icons.broken_image, size: 48, color: Colors.grey),
+                          Icon(
+                            Icons.broken_image,
+                            size: 48,
+                            color: Colors.grey,
+                          ),
                           SizedBox(height: 8),
                           Text(
                             'Gagal memuat gambar',
@@ -420,7 +451,9 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
                       margin: const EdgeInsets.symmetric(horizontal: 4.0),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(4),
-                        color: Colors.white.withAlpha(_currentPage == entry.key ? 255 : 120),
+                        color: Colors.white.withAlpha(
+                          _currentPage == entry.key ? 255 : 120,
+                        ),
                       ),
                     );
                   }).toList(),
@@ -433,7 +466,6 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
   }
 
   // Menghapus _buildImageHeader lama
-
 
   Widget _buildTitleSection() {
     return Text(
@@ -530,10 +562,10 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
   Widget _buildDescriptionSection() {
     final String deskripsi = hotel['deskripsi']?.toString() ?? '';
     final bool hasDeskripsi = deskripsi.trim().isNotEmpty;
-    final String deskripsiText = hasDeskripsi 
-        ? deskripsi 
+    final String deskripsiText = hasDeskripsi
+        ? deskripsi
         : 'Informasi deskripsi belum tersedia untuk hotel ini.';
-    
+
     // Tampilkan tombol hanya jika teks cukup panjang
     final bool isTextLong = deskripsi.length > 160;
 
@@ -552,7 +584,9 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
             deskripsiText,
             style: const TextStyle(color: AppColors.textSecondary, height: 1.6),
             maxLines: _isDescriptionExpanded ? null : 4,
-            overflow: _isDescriptionExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+            overflow: _isDescriptionExpanded
+                ? TextOverflow.visible
+                : TextOverflow.ellipsis,
           ),
         ),
         if (hasDeskripsi && isTextLong) ...[
@@ -718,7 +752,13 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String title, String subtitle, {VoidCallback? onTap, bool showAction = false}) {
+  Widget _buildInfoRow(
+    IconData icon,
+    String title,
+    String subtitle, {
+    VoidCallback? onTap,
+    bool showAction = false,
+  }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -754,7 +794,11 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const Icon(Icons.chevron_right, color: AppColors.primary, size: 14),
+                            const Icon(
+                              Icons.chevron_right,
+                              color: AppColors.primary,
+                              size: 14,
+                            ),
                           ],
                         ),
                     ],
@@ -890,7 +934,11 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
             child: const Center(
               child: Column(
                 children: [
-                  Icon(Icons.rate_review_outlined, size: 48, color: Colors.grey),
+                  Icon(
+                    Icons.rate_review_outlined,
+                    size: 48,
+                    color: Colors.grey,
+                  ),
                   SizedBox(height: 12),
                   Text(
                     'Belum ada ulasan untuk penginapan ini.',
@@ -908,7 +956,8 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _ulasanList.length,
             separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, index) => _buildReviewCard(_ulasanList[index]),
+            itemBuilder: (context, index) =>
+                _buildReviewCard(_ulasanList[index]),
           ),
       ],
     );
@@ -943,7 +992,9 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 2.0),
                       child: Icon(
-                        index < _selectedRating ? Icons.star : Icons.star_border,
+                        index < _selectedRating
+                            ? Icons.star
+                            : Icons.star_border,
                         color: Colors.orange,
                         size: 28,
                       ),
@@ -977,7 +1028,9 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 elevation: 0,
               ),
@@ -985,9 +1038,15 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
                   ? const SizedBox(
                       height: 20,
                       width: 20,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
                     )
-                  : const Text('Kirim Ulasan', style: TextStyle(fontWeight: FontWeight.bold)),
+                  : const Text(
+                      'Kirim Ulasan',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
             ),
           ),
         ],
@@ -999,7 +1058,11 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Silakan login terlebih dahulu untuk memberikan ulasan.')),
+        const SnackBar(
+          content: Text(
+            'Silakan login terlebih dahulu untuk memberikan ulasan.',
+          ),
+        ),
       );
       return;
     }
@@ -1038,16 +1101,17 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
       debugPrint('SUBMIT_HOTEL_ULASAN_ERROR: $e');
       if (mounted) {
         setState(() => _isSubmittingUlasan = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal mengirim ulasan: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Gagal mengirim ulasan: $e')));
       }
     }
   }
 
   Widget _buildReviewCard(Map<String, dynamic> ulasanData) {
     final profiles = ulasanData['profiles'] as Map<String, dynamic>?;
-    final String name = profiles?['nama_lengkap']?.toString() ?? 'Pengguna Delira';
+    final String name =
+        profiles?['nama_lengkap']?.toString() ?? 'Pengguna Delira';
     final String comment = ulasanData['ulasan']?.toString() ?? '-';
     final int rating = (ulasanData['rating'] as num?)?.toInt() ?? 5;
 
@@ -1084,7 +1148,9 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
                       5,
                       (i) => Icon(
                         Icons.star,
-                        color: i < rating ? Colors.orange : Colors.grey.shade300,
+                        color: i < rating
+                            ? Colors.orange
+                            : Colors.grey.shade300,
                         size: 14,
                       ),
                     ),
@@ -1096,7 +1162,10 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
           const SizedBox(height: 12),
           Text(
             comment,
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+            ),
           ),
         ],
       ),
@@ -1134,86 +1203,105 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
   }
 
   Widget _buildBottomBookingBar(BuildContext context) {
+    // Check if bottom padding exists (3-button nav or gestures)
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
     return Align(
       alignment: Alignment.bottomCenter,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 8,
-              offset: Offset(0, -2),
+      child: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(200), // Slightly translucent white
             ),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Price section (flexible, takes remaining space)
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                16, 
+                6, // Dikembalikan sedikit agar ada jarak nyaman (biar berjarak)
+                16, 
+                bottomPadding + 4, // Ruang aman bawah untuk navigasi sistem
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start, // Pindah ke START agar benar-benar mepet atas
                 children: [
-                  Text(
-                    'Mulai dari',
-                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                  ),
-                  const SizedBox(height: 2),
-                  RichText(
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    text: TextSpan(
-                      children: [
-                        TextSpan(
-                          text: _formatHarga(hotel['harga_termurah']),
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1A6B4A),
+                  // Price section (flexible, takes remaining space)
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 4), // Sedikit offset agar teks sejajar tengah tombol secara visual tanpa menambah tinggi bar
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Mulai dari',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Colors.grey[600],
+                              height: 1.0, // Hilangkan leading tambahan
+                            ),
                           ),
+                          const SizedBox(height: 2),
+                          RichText(
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            text: TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: _formatHarga(hotel['harga_termurah']),
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF1A6B4A),
+                                  ),
+                                ),
+                                const TextSpan(
+                                  text: '/malam',
+                                  style: TextStyle(
+                                    fontSize: 12, 
+                                    color: Colors.grey,
+                                    height: 1.0, 
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Pesan Sekarang button (fixed width)
+                  SizedBox(
+                    width: 160,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => RoomSelectionPage(hotel: hotel),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1A6B4A),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        const TextSpan(
-                          text: '/malam',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
-                      ],
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Pesan Sekarang',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 12),
-            // Pesan Sekarang button (fixed width)
-            SizedBox(
-              width: 160,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => RoomSelectionPage(hotel: hotel),
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A6B4A),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-                child: const Text(
-                  'Pesan Sekarang',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
