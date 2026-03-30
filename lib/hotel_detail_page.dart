@@ -251,7 +251,9 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
                         _buildLocationSection(),
                         const SizedBox(height: 32),
                         _buildReviewsSection(),
-                        const SizedBox(height: 50),
+                        const SizedBox(
+                          height: 90,
+                        ), // Memberi ruang aman untuk tombol "Pesan Sekarang" di bawah
                       ],
                     ),
                   ),
@@ -1217,18 +1219,21 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
             ),
             child: Padding(
               padding: EdgeInsets.fromLTRB(
-                16, 
+                16,
                 6, // Dikembalikan sedikit agar ada jarak nyaman (biar berjarak)
-                16, 
+                16,
                 bottomPadding + 4, // Ruang aman bawah untuk navigasi sistem
               ),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start, // Pindah ke START agar benar-benar mepet atas
+                crossAxisAlignment: CrossAxisAlignment
+                    .start, // Pindah ke START agar benar-benar mepet atas
                 children: [
                   // Price section (flexible, takes remaining space)
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.only(top: 4), // Sedikit offset agar teks sejajar tengah tombol secara visual tanpa menambah tinggi bar
+                      padding: const EdgeInsets.only(
+                        top: 4,
+                      ), // Sedikit offset agar teks sejajar tengah tombol secara visual tanpa menambah tinggi bar
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
@@ -1258,9 +1263,9 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
                                 const TextSpan(
                                   text: '/malam',
                                   style: TextStyle(
-                                    fontSize: 12, 
+                                    fontSize: 12,
                                     color: Colors.grey,
-                                    height: 1.0, 
+                                    height: 1.0,
                                   ),
                                 ),
                               ],
@@ -1280,7 +1285,8 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => RoomSelectionPage(hotel: hotel),
+                            builder: (context) =>
+                                RoomSelectionPage(hotel: hotel),
                           ),
                         );
                       },
@@ -1294,7 +1300,10 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
                       ),
                       child: const Text(
                         'Pesan Sekarang',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),

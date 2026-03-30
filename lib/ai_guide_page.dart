@@ -68,7 +68,7 @@ class _AIGuidePageState extends State<AIGuidePage>
 
   // Chat AI
   final String _geminiApiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
-  
+
   late final GenerativeModel _visionModel;
   late final GenerativeModel _chatModel;
 
@@ -83,7 +83,7 @@ class _AIGuidePageState extends State<AIGuidePage>
   late stt.SpeechToText _speechToText;
   bool _speechEnabled = false;
   bool _isListening = false;
-  
+
   // Animation for Scanning Effect
   late AnimationController _scanAnimController;
   late Animation<double> _scanAnimation;
@@ -138,14 +138,21 @@ class _AIGuidePageState extends State<AIGuidePage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    
+
     // Initialize Gemini Models
-    _visionModel = GenerativeModel(model: 'gemini-2.5-flash', apiKey: _geminiApiKey);
-    _chatModel = GenerativeModel(model: 'gemini-2.5-flash', apiKey: _geminiApiKey);
+    _visionModel = GenerativeModel(
+      model: 'gemini-2.5-flash',
+      apiKey: _geminiApiKey,
+    );
+    _chatModel = GenerativeModel(
+      model: 'gemini-2.5-flash',
+      apiKey: _geminiApiKey,
+    );
 
     _messages.add({
       'role': 'bot',
-      'text': 'Halo! 👋 Saya MedanBot, asisten wisata Kota Medan. Ada yang bisa saya bantu? 🗺️',
+      'text':
+          'Halo! 👋 Saya MedanBot, asisten wisata Kota Medan. Ada yang bisa saya bantu? 🗺️',
     });
     _initTTS();
     _initSTT();
@@ -211,82 +218,88 @@ class _AIGuidePageState extends State<AIGuidePage>
   void _startARDetection() {
     _arTimer?.cancel();
     debugPrint('DEBUG: Memulai Timer Deteksi AR (Delay 2s)');
-    
+
     // Beri waktu kamera benar-benar siap sebelum deteksi pertama
     Future.delayed(const Duration(seconds: 2), () {
       if (!mounted || !_isARMode) return;
-      
+
       _arTimer = Timer.periodic(const Duration(seconds: 60), (_) async {
         if (!_isARMode || !_cameraReady || _cameraController == null) return;
         if (_isARDetecting || !_cameraController!.value.isInitialized) return;
-      
-      _isARDetecting = true;
-      if (mounted) setState(() {});
-      
-      try {
-        debugPrint('DEBUG: Menangkap foto AR...');
-        final XFile file = await _cameraController!.takePicture();
-        final bytes = await File(file.path).readAsBytes();
-        
-        debugPrint('DEBUG: Mengirim ke Gemini Vision via Package...');
-        if (_isCooldown) {
-          debugPrint('DEBUG: AI sedang Cooldown, skip deteksi AR.');
-          return;
-        }
 
-        final content = [
-          Content.multi([
-            DataPart('image/jpeg', bytes),
-            TextPart(
+        _isARDetecting = true;
+        if (mounted) setState(() {});
+
+        try {
+          debugPrint('DEBUG: Menangkap foto AR...');
+          final XFile file = await _cameraController!.takePicture();
+          final bytes = await File(file.path).readAsBytes();
+
+          debugPrint('DEBUG: Mengirim ke Gemini Vision via Package...');
+          if (_isCooldown) {
+            debugPrint('DEBUG: AI sedang Cooldown, skip deteksi AR.');
+            return;
+          }
+
+          final content = [
+            Content.multi([
+              DataPart('image/jpeg', bytes),
+              TextPart(
                 'Identifikasi objek utama (bangunan, fasilitas, atau benda unik). '
                 'Respon HANYA format JSON list: [{"name": "..", "description": "..", "x": 1-100, "y": 1-100}]. '
                 'PENTING: Gunakan bahasa yang sama dengan input atau bahasa yang paling sesuai untuk turis (ID/EN). '
-                'Persona: Delira (santai & bersahabat). Tanpa emoji. Maks 2 objek.'),
-          ])
-        ];
+                'Persona: Delira (santai & bersahabat). Tanpa emoji. Maks 2 objek.',
+              ),
+            ]),
+          ];
 
-        final response = await _visionModel.generateContent(content);
-        final jsonText = response.text;
-        
-        debugPrint('DEBUG: Terdeteksi: $jsonText');
-        if (jsonText != null && jsonText.isNotEmpty && mounted) {
-          try {
-            // More robust JSON cleaning
-            String jsonStr = jsonText.trim();
-            final RegExp jsonRegex = RegExp(r'\[.*\]', dotAll: true);
-            final match = jsonRegex.stringMatch(jsonStr);
-            if (match == null) throw Exception('Invalid JSON format');
-            
-            final List<dynamic> list = json.decode(match);
-            final List<DetectedObject> newObjects = list.map((item) => DetectedObject.fromJson(item)).toList();
-            
-            setState(() => _arObjects = newObjects);
+          final response = await _visionModel.generateContent(content);
+          final jsonText = response.text;
 
-            // Auto-read the first object if it's new
-            if (newObjects.isNotEmpty) {
-              final first = newObjects.first;
-              _speak("${first.name}. ${first.description}");
+          debugPrint('DEBUG: Terdeteksi: $jsonText');
+          if (jsonText != null && jsonText.isNotEmpty && mounted) {
+            try {
+              // More robust JSON cleaning
+              String jsonStr = jsonText.trim();
+              final RegExp jsonRegex = RegExp(r'\[.*\]', dotAll: true);
+              final match = jsonRegex.stringMatch(jsonStr);
+              if (match == null) throw Exception('Invalid JSON format');
+
+              final List<dynamic> list = json.decode(match);
+              final List<DetectedObject> newObjects = list
+                  .map((item) => DetectedObject.fromJson(item))
+                  .toList();
+
+              setState(() => _arObjects = newObjects);
+
+              // Auto-read the first object if it's new
+              if (newObjects.isNotEmpty) {
+                final first = newObjects.first;
+                _speak("${first.name}. ${first.description}");
+              }
+            } catch (e) {
+              debugPrint('DEBUG: Error parsing AR JSON: $e');
             }
-          } catch (e) {
-            debugPrint('DEBUG: Error parsing AR JSON: $e');
           }
-        }
-      } catch (e) {
-        debugPrint('DEBUG: Error Deteksi AR: $e');
-        if (e.toString().contains('429') || e.toString().contains('quota')) {
-          _triggerCooldown();
-        } else {
-          // Show error to user via SnackBar occasionally so they aren't confused
-          if (mounted && _isARMode) {
-             ScaffoldMessenger.of(context).showSnackBar(
-               SnackBar(content: Text('Delira (AR Error): $e'), duration: const Duration(seconds: 3)),
-             );
+        } catch (e) {
+          debugPrint('DEBUG: Error Deteksi AR: $e');
+          if (e.toString().contains('429') || e.toString().contains('quota')) {
+            _triggerCooldown();
+          } else {
+            // Show error to user via SnackBar occasionally so they aren't confused
+            if (mounted && _isARMode) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Delira (AR Error): $e'),
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+            }
           }
+        } finally {
+          _isARDetecting = false;
+          if (mounted) setState(() {});
         }
-      } finally {
-        _isARDetecting = false;
-        if (mounted) setState(() {});
-      }
       });
     });
   }
@@ -298,7 +311,8 @@ class _AIGuidePageState extends State<AIGuidePage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
+    if (_cameraController == null || !_cameraController!.value.isInitialized)
+      return;
     if (state == AppLifecycleState.inactive) {
       _cameraController?.dispose();
     } else if (state == AppLifecycleState.resumed) {
@@ -345,9 +359,7 @@ class _AIGuidePageState extends State<AIGuidePage>
 
   Widget _buildCameraPreview() {
     if (_cameraController != null && _cameraController!.value.isInitialized) {
-      return SizedBox.expand(
-        child: CameraPreview(_cameraController!),
-      );
+      return SizedBox.expand(child: CameraPreview(_cameraController!));
     }
     return Container(
       color: Colors.black,
@@ -357,8 +369,10 @@ class _AIGuidePageState extends State<AIGuidePage>
           children: [
             CircularProgressIndicator(color: AppColors.primary),
             SizedBox(height: 12),
-            Text('Menyiapkan kamera...',
-                style: TextStyle(color: Colors.white54, fontSize: 13)),
+            Text(
+              'Menyiapkan kamera...',
+              style: TextStyle(color: Colors.white54, fontSize: 13),
+            ),
           ],
         ),
       ),
@@ -394,16 +408,17 @@ class _AIGuidePageState extends State<AIGuidePage>
 
     try {
       final bytes = await File(path).readAsBytes();
-      
+
       final content = [
         Content.multi([
           DataPart('image/jpeg', bytes),
           TextPart(
-              'Identifikasi foto ini dengan santai dan bersahabat sebagai Delira. '
-              'Jika WISATA: Sebut Nama, Deskripsi menarik, Hotel Terdekat & Harga, Tips Navigasi. '
-              'Jika BUDAYA: Sebut Nama, Asal, Harga, Tempat Beli. '
-              'PENTING: Gunakan bahasa yang sesuai dengan konteks (ID/EN). Respon harus ramah tanpa emoji.'),
-        ])
+            'Identifikasi foto ini dengan santai dan bersahabat sebagai Delira. '
+            'Jika WISATA: Sebut Nama, Deskripsi menarik, Hotel Terdekat & Harga, Tips Navigasi. '
+            'Jika BUDAYA: Sebut Nama, Asal, Harga, Tempat Beli. '
+            'PENTING: Gunakan bahasa yang sesuai dengan konteks (ID/EN). Respon harus ramah tanpa emoji.',
+          ),
+        ]),
       ];
 
       final response = await _visionModel.generateContent(content);
@@ -414,10 +429,16 @@ class _AIGuidePageState extends State<AIGuidePage>
           _scanResult = result;
           _isScanLoading = false;
         });
-        
+
         // Record manual scan to history
-        final scanName = result.split('\n').first.replaceAll(RegExp(r'[*#_]'), '').trim();
-        _recordScan(scanName.length > 50 ? '${scanName.substring(0, 47)}...' : scanName);
+        final scanName = result
+            .split('\n')
+            .first
+            .replaceAll(RegExp(r'[*#_]'), '')
+            .trim();
+        _recordScan(
+          scanName.length > 50 ? '${scanName.substring(0, 47)}...' : scanName,
+        );
       } else {
         throw Exception('No analysis result');
       }
@@ -426,7 +447,8 @@ class _AIGuidePageState extends State<AIGuidePage>
       if (e.toString().contains('429') || e.toString().contains('quota')) {
         _triggerCooldown();
         setState(() {
-          _scanResult = '⚠️ Batas penggunaan (Quota) tercapai. AI sedang beristirahat 30 detik. Silakan coba sebentar lagi.';
+          _scanResult =
+              '⚠️ Batas penggunaan (Quota) tercapai. AI sedang beristirahat 30 detik. Silakan coba sebentar lagi.';
           _isScanLoading = false;
         });
       } else {
@@ -445,10 +467,11 @@ class _AIGuidePageState extends State<AIGuidePage>
       _arObjects = [
         DetectedObject(
           name: "Sistem AI Beristirahat",
-          description: "AI sedang beristirahat sejenak untuk mendinginkan mesin.",
+          description:
+              "AI sedang beristirahat sejenak untuk mendinginkan mesin.",
           x: 50,
-          y: 50
-        )
+          y: 50,
+        ),
       ];
     });
     _cooldownTimer?.cancel();
@@ -494,19 +517,25 @@ class _AIGuidePageState extends State<AIGuidePage>
 
   Future<void> _sendMessage(String text) async {
     if (text.trim().isEmpty) return;
-    
+
     // Check connection or basic validation
     bool isLikelyOffline = false;
     try {
-      final result = await InternetAddress.lookup('google.com').timeout(const Duration(seconds: 3));
-      if (result.isEmpty || result[0].rawAddress.isEmpty) isLikelyOffline = true;
+      final result = await InternetAddress.lookup(
+        'google.com',
+      ).timeout(const Duration(seconds: 3));
+      if (result.isEmpty || result[0].rawAddress.isEmpty)
+        isLikelyOffline = true;
     } catch (_) {
       isLikelyOffline = true;
     }
 
     if (isLikelyOffline) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Koneksi internet tidak stabil. Coba lagi.'), backgroundColor: Colors.orange),
+        const SnackBar(
+          content: Text('Koneksi internet tidak stabil. Coba lagi.'),
+          backgroundColor: Colors.orange,
+        ),
       );
     }
 
@@ -531,7 +560,11 @@ class _AIGuidePageState extends State<AIGuidePage>
     }
 
     try {
-      final content = [Content.text('Kamu adalah MedanBot asisten wisata Medan. Jawab secara informatif dalam Bahasa Indonesia. JANGAN gunakan emoji. Pertanyaan: $text')];
+      final content = [
+        Content.text(
+          'Kamu adalah MedanBot asisten wisata Medan. Jawab secara informatif dalam Bahasa Indonesia. JANGAN gunakan emoji. Pertanyaan: $text',
+        ),
+      ];
       final response = await _chatModel.generateContent(content);
       final botReply = response.text;
 
@@ -547,10 +580,12 @@ class _AIGuidePageState extends State<AIGuidePage>
       }
     } catch (e) {
       debugPrint('DEBUG: Error Chat: $e');
-      String errorMsg = '🤔 Maaf, saya sedang gangguan sebentar. Coba tanyakan lagi ya!';
-      
+      String errorMsg =
+          '🤔 Maaf, saya sedang gangguan sebentar. Coba tanyakan lagi ya!';
+
       if (e.toString().contains('429') || e.toString().contains('quota')) {
-        errorMsg = '⚠️ Wah, saya lagi ramai pengunjung! Beri saya waktu 30 detik untuk istirahat ya. 🙏';
+        errorMsg =
+            '⚠️ Wah, saya lagi ramai pengunjung! Beri saya waktu 30 detik untuk istirahat ya. 🙏';
         _triggerCooldown();
       }
 
@@ -563,17 +598,50 @@ class _AIGuidePageState extends State<AIGuidePage>
       _saveChatHistory(text, 'ERROR: $e');
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Delira Error: $e'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text('Delira Error: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
 
   void _showEmojiPicker() {
     final List<String> travelEmojis = [
-      '🗺️', '📍', '🕌', '🏰', '⛪', '🍜', '🍲', '☕', '🍰', '🏨', 
-      '🚗', '✈️', '🏝️', '🎒', '📸', '🚌', '🛵', '🎟️', '🛍️', '💰',
-      '⭐', '✅', '❤️', '👋', '😊', '😍', '🙌', '🙏', '✨', '🔥',
-      ' Medan ', ' Kuliner ', ' Wisata ', ' Hotel '
+      '🗺️',
+      '📍',
+      '🕌',
+      '🏰',
+      '⛪',
+      '🍜',
+      '🍲',
+      '☕',
+      '🍰',
+      '🏨',
+      '🚗',
+      '✈️',
+      '🏝️',
+      '🎒',
+      '📸',
+      '🚌',
+      '🛵',
+      '🎟️',
+      '🛍️',
+      '💰',
+      '⭐',
+      '✅',
+      '❤️',
+      '👋',
+      '😊',
+      '😍',
+      '🙌',
+      '🙏',
+      '✨',
+      '🔥',
+      ' Medan ',
+      ' Kuliner ',
+      ' Wisata ',
+      ' Hotel ',
     ];
 
     showModalBottomSheet(
@@ -589,8 +657,10 @@ class _AIGuidePageState extends State<AIGuidePage>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Pilih Emoji atau Kata Kunci', 
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const Text(
+                'Pilih Emoji atau Kata Kunci',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
               const SizedBox(height: 16),
               Expanded(
                 child: GridView.builder(
@@ -606,7 +676,8 @@ class _AIGuidePageState extends State<AIGuidePage>
                         setState(() {
                           _textController.text += travelEmojis[index];
                           // Move cursor to end
-                          _textController.selection = TextSelection.fromPosition(
+                          _textController
+                              .selection = TextSelection.fromPosition(
                             TextPosition(offset: _textController.text.length),
                           );
                         });
@@ -618,7 +689,10 @@ class _AIGuidePageState extends State<AIGuidePage>
                           borderRadius: BorderRadius.circular(8),
                         ),
                         alignment: Alignment.center,
-                        child: Text(travelEmojis[index], style: const TextStyle(fontSize: 20)),
+                        child: Text(
+                          travelEmojis[index],
+                          style: const TextStyle(fontSize: 20),
+                        ),
                       ),
                     );
                   },
@@ -646,7 +720,7 @@ class _AIGuidePageState extends State<AIGuidePage>
     try {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null) return;
-      
+
       await Supabase.instance.client.from('riwayat_scan').insert({
         'user_id': user.id,
         'nama_objek': objectName,
@@ -680,9 +754,7 @@ class _AIGuidePageState extends State<AIGuidePage>
             children: [
               _buildTabBar(),
               Expanded(
-                child: _selectedTab == 0
-                    ? _buildCameraTab()
-                    : _buildChatPage(),
+                child: _selectedTab == 0 ? _buildCameraTab() : _buildChatPage(),
               ),
             ],
           ),
@@ -700,7 +772,9 @@ class _AIGuidePageState extends State<AIGuidePage>
         color: Colors.white,
         child: Row(
           children: [
-            Expanded(child: _tabItem(Icons.camera_alt_outlined, 'Scan / AR', 0)),
+            Expanded(
+              child: _tabItem(Icons.camera_alt_outlined, 'Scan / AR', 0),
+            ),
             Expanded(child: _tabItem(Icons.chat_bubble_outline, 'Chat AI', 1)),
           ],
         ),
@@ -725,7 +799,11 @@ class _AIGuidePageState extends State<AIGuidePage>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 15, color: active ? AppColors.primary : Colors.grey),
+            Icon(
+              icon,
+              size: 15,
+              color: active ? AppColors.primary : Colors.grey,
+            ),
             const SizedBox(width: 5),
             Text(
               label,
@@ -767,7 +845,7 @@ class _AIGuidePageState extends State<AIGuidePage>
               ),
             ),
           ),
-          
+
           // AR Floating Markers (Multiple Objects)
           ..._arObjects.map((obj) {
             final screenWidth = MediaQuery.of(context).size.width;
@@ -775,7 +853,9 @@ class _AIGuidePageState extends State<AIGuidePage>
             final xPos = (obj.x / 100) * screenWidth;
             // Limit yPos to top 60% of the screen to avoid overlapping buttons and crowding
             final yPosRaw = (obj.y / 100) * screenHeight;
-            final yPos = yPosRaw > screenHeight * 0.60 ? screenHeight * 0.60 : yPosRaw;
+            final yPos = yPosRaw > screenHeight * 0.60
+                ? screenHeight * 0.60
+                : yPosRaw;
 
             return Positioned(
               left: xPos - 80, // Offset to roughly center the marker
@@ -791,7 +871,10 @@ class _AIGuidePageState extends State<AIGuidePage>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.primary.withAlpha(225),
                           borderRadius: BorderRadius.circular(14),
@@ -829,7 +912,11 @@ class _AIGuidePageState extends State<AIGuidePage>
                           ],
                         ),
                       ),
-                      const Icon(Icons.location_on, color: Colors.white, size: 24),
+                      const Icon(
+                        Icons.location_on,
+                        color: Colors.white,
+                        size: 24,
+                      ),
                     ],
                   ),
                 ),
@@ -843,10 +930,9 @@ class _AIGuidePageState extends State<AIGuidePage>
             left: 16,
             child: _hudBadge(Icons.view_in_ar, 'AR MODE', Colors.greenAccent),
           ),
-          
+
           // High-Tech Scanning Animation
-          if (_isARDetecting)
-            _buildScanningLaser(),
+          if (_isARDetecting) _buildScanningLaser(),
         ],
 
         // ── Scan Mode overlay: QRIS-style ──
@@ -857,17 +943,16 @@ class _AIGuidePageState extends State<AIGuidePage>
           Positioned(
             top: 16,
             left: 16,
-            child: _hudBadge(Icons.qr_code_scanner, 'SCAN MODE', Colors.amberAccent),
+            child: _hudBadge(
+              Icons.qr_code_scanner,
+              'SCAN MODE',
+              Colors.amberAccent,
+            ),
           ),
         ],
 
         // ── Bottom controls ──
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: _buildBottomControls(),
-        ),
+        Positioned(bottom: 0, left: 0, right: 0, child: _buildBottomControls()),
       ],
     );
   }
@@ -885,8 +970,14 @@ class _AIGuidePageState extends State<AIGuidePage>
         children: [
           Icon(icon, color: color, size: 12),
           const SizedBox(width: 5),
-          Text(label,
-              style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.bold)),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ],
       ),
     );
@@ -946,24 +1037,26 @@ class _AIGuidePageState extends State<AIGuidePage>
     return AnimatedBuilder(
       animation: _scanAnimation,
       builder: (context, child) {
-        return LayoutBuilder(builder: (context, constraints) {
-          const boxSize = 240.0;
-          final cx = constraints.maxWidth / 2;
-          final cy = constraints.maxHeight / 2;
-          final left = cx - boxSize / 2;
-          final top = cy - boxSize / 2 - 40;
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            const boxSize = 240.0;
+            final cx = constraints.maxWidth / 2;
+            final cy = constraints.maxHeight / 2;
+            final left = cx - boxSize / 2;
+            final top = cy - boxSize / 2 - 40;
 
-          return CustomPaint(
-            painter: _ScanOverlayPainter(
-              scanRect: Rect.fromLTWH(left, top, boxSize, boxSize),
-              animationValue: _scanAnimation.value,
-            ),
-            child: SizedBox(
-              width: constraints.maxWidth,
-              height: constraints.maxHeight,
-            ),
-          );
-        });
+            return CustomPaint(
+              painter: _ScanOverlayPainter(
+                scanRect: Rect.fromLTWH(left, top, boxSize, boxSize),
+                animationValue: _scanAnimation.value,
+              ),
+              child: SizedBox(
+                width: constraints.maxWidth,
+                height: constraints.maxHeight,
+              ),
+            );
+          },
+        );
       },
     );
   }
@@ -1009,7 +1102,10 @@ class _AIGuidePageState extends State<AIGuidePage>
                 GestureDetector(
                   onTap: _pickFromGallery,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white.withAlpha(30),
                       borderRadius: BorderRadius.circular(30),
@@ -1018,9 +1114,16 @@ class _AIGuidePageState extends State<AIGuidePage>
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.photo_library_outlined, color: Colors.white, size: 20),
+                        Icon(
+                          Icons.photo_library_outlined,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                         SizedBox(width: 8),
-                        Text('Galeri', style: TextStyle(color: Colors.white, fontSize: 13)),
+                        Text(
+                          'Galeri',
+                          style: TextStyle(color: Colors.white, fontSize: 13),
+                        ),
                       ],
                     ),
                   ),
@@ -1036,10 +1139,7 @@ class _AIGuidePageState extends State<AIGuidePage>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.white,
-                      border: Border.all(
-                        color: AppColors.primary,
-                        width: 4,
-                      ),
+                      border: Border.all(color: AppColors.primary, width: 4),
                     ),
                     child: Center(
                       child: Container(
@@ -1049,7 +1149,11 @@ class _AIGuidePageState extends State<AIGuidePage>
                           shape: BoxShape.circle,
                           color: AppColors.primary,
                         ),
-                        child: const Icon(Icons.camera_alt, color: Colors.white, size: 26),
+                        child: const Icon(
+                          Icons.camera_alt,
+                          color: Colors.white,
+                          size: 26,
+                        ),
                       ),
                     ),
                   ),
@@ -1088,7 +1192,11 @@ class _AIGuidePageState extends State<AIGuidePage>
                   child: CircleAvatar(
                     backgroundColor: Colors.black54,
                     child: IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                      icon: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                       onPressed: _resetScan,
                     ),
                   ),
@@ -1113,7 +1221,10 @@ class _AIGuidePageState extends State<AIGuidePage>
                         SizedBox(height: 14),
                         Text(
                           'AI sedang menganalisis foto...',
-                          style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 13,
+                          ),
                         ),
                       ],
                     ),
@@ -1144,8 +1255,11 @@ class _AIGuidePageState extends State<AIGuidePage>
                                 color: AppColors.primaryLight,
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Icon(Icons.auto_awesome,
-                                  color: AppColors.primary, size: 18),
+                              child: const Icon(
+                                Icons.auto_awesome,
+                                color: AppColors.primary,
+                                size: 18,
+                              ),
                             ),
                             const SizedBox(width: 10),
                             const Text(
@@ -1169,31 +1283,46 @@ class _AIGuidePageState extends State<AIGuidePage>
                             height: 1.6,
                           ),
                         ),
-                        if (_scanResult != null && 
-                            (_scanResult!.toLowerCase().contains('hotel') || 
-                             _scanResult!.toLowerCase().contains('wisata') || 
-                             _scanResult!.toLowerCase().contains('landmark')))
+                        if (_scanResult != null &&
+                            (_scanResult!.toLowerCase().contains('hotel') ||
+                                _scanResult!.toLowerCase().contains('wisata') ||
+                                _scanResult!.toLowerCase().contains(
+                                  'landmark',
+                                )))
                           Padding(
                             padding: const EdgeInsets.only(top: 20),
                             child: SizedBox(
                               width: double.infinity,
                               child: OutlinedButton.icon(
                                 onPressed: widget.onHotelRequested,
-                                icon: const Icon(Icons.hotel_outlined, size: 18),
+                                icon: const Icon(
+                                  Icons.hotel_outlined,
+                                  size: 18,
+                                ),
                                 label: const Text('Cek Hotel Terdekat'),
                                 style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(color: AppColors.primary),
+                                  side: const BorderSide(
+                                    color: AppColors.primary,
+                                  ),
                                   foregroundColor: AppColors.primary,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        if (_scanResult != null && 
-                            (_scanResult!.toLowerCase().contains('budaya') || 
-                             _scanResult!.toLowerCase().contains('kerajinan') || 
-                             _scanResult!.toLowerCase().contains('oleh-oleh')))
+                        if (_scanResult != null &&
+                            (_scanResult!.toLowerCase().contains('budaya') ||
+                                _scanResult!.toLowerCase().contains(
+                                  'kerajinan',
+                                ) ||
+                                _scanResult!.toLowerCase().contains(
+                                  'oleh-oleh',
+                                )))
                           Padding(
                             padding: const EdgeInsets.only(top: 12),
                             child: SizedBox(
@@ -1203,24 +1332,36 @@ class _AIGuidePageState extends State<AIGuidePage>
                                   showDialog(
                                     context: context,
                                     builder: (context) => AlertDialog(
-                                      title: const Text('Dukung Pengrajin Lokal'),
-                                      content: const Text('Terima kasih! Dengan membeli produk ini, Anda turut melestarikan budaya Medan dan mendukung ekonomi pengrajin lokal. ❤️'),
+                                      title: const Text(
+                                        'Dukung Pengrajin Lokal',
+                                      ),
+                                      content: const Text(
+                                        'Terima kasih! Dengan membeli produk ini, Anda turut melestarikan budaya Medan dan mendukung ekonomi pengrajin lokal. ❤️',
+                                      ),
                                       actions: [
                                         TextButton(
-                                          onPressed: () => Navigator.pop(context),
+                                          onPressed: () =>
+                                              Navigator.pop(context),
                                           child: const Text('Tutup'),
                                         ),
                                       ],
                                     ),
                                   );
                                 },
-                                icon: const Icon(Icons.favorite_border, size: 18),
+                                icon: const Icon(
+                                  Icons.favorite_border,
+                                  size: 18,
+                                ),
                                 label: const Text('Dukung Produk Lokal'),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.pinkAccent.shade100,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                   elevation: 0,
                                 ),
                               ),
@@ -1243,7 +1384,9 @@ class _AIGuidePageState extends State<AIGuidePage>
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                   elevation: 0,
                 ),
               ),
@@ -1277,7 +1420,9 @@ class _AIGuidePageState extends State<AIGuidePage>
         ),
         Container(
           color: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 16), // TASK 3: Meta floating style
+          padding: const EdgeInsets.symmetric(
+            horizontal: 16,
+          ), // TASK 3: Meta floating style
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1285,31 +1430,43 @@ class _AIGuidePageState extends State<AIGuidePage>
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.fromLTRB(0, 6, 0, 0),
                 child: Row(
-                  children: [
-                    'Tempat terdekat',
-                    'Sejarah Medan',
-                    'Rekomendasi',
-                    'Hotel terbaik',
-                  ].map((chip) => Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ActionChip(
-                          label: Text(chip,
-                              style: const TextStyle(
-                                  fontSize: 11, color: AppColors.primary)),
-                          onPressed: () => _sendMessage(chip),
-                          backgroundColor: Colors.white,
-                          side: const BorderSide(color: AppColors.primary),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      )).toList(),
+                  children:
+                      [
+                            'Tempat terdekat',
+                            'Sejarah Medan',
+                            'Rekomendasi',
+                            'Hotel terbaik',
+                          ]
+                          .map(
+                            (chip) => Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: ActionChip(
+                                label: Text(
+                                  chip,
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                                onPressed: () => _sendMessage(chip),
+                                backgroundColor: Colors.white,
+                                side: const BorderSide(
+                                  color: AppColors.primary,
+                                ),
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
+                          )
+                          .toList(),
                 ),
               ),
               Padding(
                 // Dynamic padding: Ensures comfortable distance from system nav bar or keyboard
                 padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).viewInsets.bottom > 0 
-                      ? 20 // Gap when keyboard open
-                      : MediaQuery.of(context).padding.bottom + 32, // More lift from navigation bar
+                  bottom: MediaQuery.of(context).viewInsets.bottom > 0
+                      ? 20 // Gap ketika keyboard terbuka
+                      : MediaQuery.of(context).padding.bottom +
+                            36, // Ditambah sedikit lagi agar tidak menabrak bar navigasi HP
                 ),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(0, 6, 0, 12),
@@ -1324,20 +1481,36 @@ class _AIGuidePageState extends State<AIGuidePage>
                           textInputAction: TextInputAction.send,
                           onSubmitted: (val) => _sendMessage(val),
                           decoration: InputDecoration(
-                            hintText: _isListening ? 'Mendengarkan...' : 'Tanyakan sesuatu...',
+                            hintText: _isListening
+                                ? 'Mendengarkan...'
+                                : 'Tanyakan sesuatu...',
                             hintStyle: TextStyle(
-                                color: _isListening ? Colors.redAccent : Colors.grey[400]),
+                              color: _isListening
+                                  ? Colors.redAccent
+                                  : Colors.grey[400],
+                            ),
                             prefixIcon: IconButton(
-                               icon: const Icon(Icons.insert_emoticon_outlined, size: 22, color: Colors.grey),
-                               onPressed: _showEmojiPicker,
-                             ),
-                            suffixIcon: _speechEnabled 
+                              icon: const Icon(
+                                Icons.insert_emoticon_outlined,
+                                size: 22,
+                                color: Colors.grey,
+                              ),
+                              onPressed: _showEmojiPicker,
+                            ),
+                            suffixIcon: _speechEnabled
                                 ? IconButton(
                                     icon: Icon(
-                                      _isListening ? Icons.stop_circle_rounded : Icons.mic_none_rounded,
-                                      color: _isListening ? Colors.redAccent : Colors.grey[600],
+                                      _isListening
+                                          ? Icons.stop_circle_rounded
+                                          : Icons.mic_none_rounded,
+                                      color: _isListening
+                                          ? Colors.redAccent
+                                          : Colors.grey[600],
+                                      size: 28, // Ukuran diperbesar
                                     ),
-                                    onPressed: _isListening ? _stopListening : _startListening,
+                                    onPressed: _isListening
+                                        ? _stopListening
+                                        : _startListening,
                                   )
                                 : null,
                             filled: true,
@@ -1347,7 +1520,9 @@ class _AIGuidePageState extends State<AIGuidePage>
                               borderSide: BorderSide.none,
                             ),
                             contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 12),
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
                             isDense: true,
                           ),
                         ),
@@ -1370,8 +1545,11 @@ class _AIGuidePageState extends State<AIGuidePage>
                               ),
                             ],
                           ),
-                          child: const Icon(Icons.send_rounded,
-                              color: Colors.white, size: 22),
+                          child: const Icon(
+                            Icons.send_rounded,
+                            color: Colors.white,
+                            size: 22,
+                          ),
                         ),
                       ),
                     ],
@@ -1393,22 +1571,27 @@ class _AIGuidePageState extends State<AIGuidePage>
         margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         constraints: BoxConstraints(
-            maxWidth: MediaQuery.of(context).size.width * 0.75),
+          maxWidth: MediaQuery.of(context).size.width * 0.75,
+        ),
         decoration: BoxDecoration(
           color: isUser ? AppColors.primary : const Color(0xFFF0F0F0),
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
             topRight: const Radius.circular(16),
-            bottomLeft:
-                isUser ? const Radius.circular(16) : const Radius.circular(4),
-            bottomRight:
-                isUser ? const Radius.circular(4) : const Radius.circular(16),
+            bottomLeft: isUser
+                ? const Radius.circular(16)
+                : const Radius.circular(4),
+            bottomRight: isUser
+                ? const Radius.circular(4)
+                : const Radius.circular(16),
           ),
         ),
         child: Text(
           message['text'] ?? '',
           style: TextStyle(
-              color: isUser ? Colors.white : Colors.black87, fontSize: 14),
+            color: isUser ? Colors.white : Colors.black87,
+            fontSize: 14,
+          ),
         ),
       ),
     );
@@ -1427,14 +1610,18 @@ class _AIGuidePageState extends State<AIGuidePage>
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('MedanBot sedang mengetik',
-                style: TextStyle(fontSize: 12, color: Colors.grey)),
+            const Text(
+              'MedanBot sedang mengetik',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
             const SizedBox(width: 8),
             const SizedBox(
               width: 12,
               height: 12,
               child: CircularProgressIndicator(
-                  strokeWidth: 2, color: AppColors.primary),
+                strokeWidth: 2,
+                color: AppColors.primary,
+              ),
             ),
           ],
         ),
@@ -1447,7 +1634,8 @@ class _AIGuidePageState extends State<AIGuidePage>
       animation: _scanAnimation,
       builder: (context, child) {
         return Positioned(
-          top: MediaQuery.of(context).size.height * 0.2 +
+          top:
+              MediaQuery.of(context).size.height * 0.2 +
               (MediaQuery.of(context).size.height * 0.4 * _scanAnimation.value),
           left: MediaQuery.of(context).size.width * 0.1,
           right: MediaQuery.of(context).size.width * 0.1,
@@ -1495,13 +1683,27 @@ class _ScanOverlayPainter extends CustomPainter {
     // Draw 4 dark rectangles around scan window
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, scanRect.top), darkPaint);
     canvas.drawRect(
-        Rect.fromLTWH(0, scanRect.top, scanRect.left, scanRect.height), darkPaint);
+      Rect.fromLTWH(0, scanRect.top, scanRect.left, scanRect.height),
+      darkPaint,
+    );
     canvas.drawRect(
-        Rect.fromLTWH(scanRect.right, scanRect.top,
-            size.width - scanRect.right, scanRect.height),
-        darkPaint);
+      Rect.fromLTWH(
+        scanRect.right,
+        scanRect.top,
+        size.width - scanRect.right,
+        scanRect.height,
+      ),
+      darkPaint,
+    );
     canvas.drawRect(
-        Rect.fromLTWH(0, scanRect.bottom, size.width, size.height - scanRect.bottom), darkPaint);
+      Rect.fromLTWH(
+        0,
+        scanRect.bottom,
+        size.width,
+        size.height - scanRect.bottom,
+      ),
+      darkPaint,
+    );
 
     // Corner brackets
     final cornerPaint = Paint()
@@ -1530,28 +1732,35 @@ class _ScanOverlayPainter extends CustomPainter {
       ..strokeWidth = 2.0;
 
     final lineY = scanRect.top + (scanRect.height * animationValue);
-    
+
     // Gradient glow for the moving line
     final glowPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          const Color(0xFF2ECC71).withAlpha(0),
-          const Color(0xFF2ECC71).withAlpha(100),
-          const Color(0xFF2ECC71).withAlpha(0),
-        ],
-      ).createShader(Rect.fromLTWH(scanRect.left, lineY - 10, scanRect.width, 20));
+      ..shader =
+          LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              const Color(0xFF2ECC71).withAlpha(0),
+              const Color(0xFF2ECC71).withAlpha(100),
+              const Color(0xFF2ECC71).withAlpha(0),
+            ],
+          ).createShader(
+            Rect.fromLTWH(scanRect.left, lineY - 10, scanRect.width, 20),
+          );
 
     canvas.drawRect(
-        Rect.fromLTWH(scanRect.left + 4, lineY - 10, scanRect.width - 8, 20),
-        glowPaint);
+      Rect.fromLTWH(scanRect.left + 4, lineY - 10, scanRect.width - 8, 20),
+      glowPaint,
+    );
 
     canvas.drawLine(
-        Offset(scanRect.left + 8, lineY), Offset(scanRect.right - 8, lineY), linePaint);
+      Offset(scanRect.left + 8, lineY),
+      Offset(scanRect.right - 8, lineY),
+      linePaint,
+    );
   }
 
   @override
-  bool shouldRepaint(covariant _ScanOverlayPainter old) => 
+  bool shouldRepaint(covariant _ScanOverlayPainter old) =>
       old.scanRect != scanRect || old.animationValue != animationValue;
 }

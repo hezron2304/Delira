@@ -47,7 +47,7 @@ class _ProfilPageState extends State<ProfilPage> {
           .from('favorit')
           .select('id')
           .eq('user_id', user.id);
-      
+
       if (mounted) {
         setState(() {
           _savedCount = res.length;
@@ -67,7 +67,7 @@ class _ProfilPageState extends State<ProfilPage> {
           .from('riwayat_scan')
           .select('id')
           .eq('user_id', user.id);
-      
+
       if (mounted) {
         setState(() {
           _scanCount = res.length;
@@ -87,7 +87,7 @@ class _ProfilPageState extends State<ProfilPage> {
           .from('riwayat_kunjungan')
           .select('id')
           .eq('user_id', user.id);
-      
+
       if (mounted) {
         setState(() {
           _visitCount = res.length;
@@ -108,7 +108,7 @@ class _ProfilPageState extends State<ProfilPage> {
           .select()
           .eq('id', user.id)
           .maybeSingle();
-      
+
       if (mounted && res != null) {
         setState(() {
           _profileData = res;
@@ -162,18 +162,18 @@ class _ProfilPageState extends State<ProfilPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal keluar: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Gagal keluar: $e')));
         setState(() => _isSigningOut = false);
       }
     }
   }
 
   void _showComingSoon() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Fitur segera hadir')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Fitur segera hadir')));
   }
 
   void _showLanguagePicker() {
@@ -235,7 +235,11 @@ class _ProfilPageState extends State<ProfilPage> {
               ),
             ),
             if (isSelected)
-              const Icon(Icons.check_circle, color: AppColors.primary, size: 20),
+              const Icon(
+                Icons.check_circle,
+                color: AppColors.primary,
+                size: 20,
+              ),
           ],
         ),
       ),
@@ -404,12 +408,19 @@ class _ProfilPageState extends State<ProfilPage> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   description,
-                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    height: 1.5,
+                  ),
                 ),
               ],
             ),
@@ -427,18 +438,22 @@ class _ProfilPageState extends State<ProfilPage> {
         children: [
           // Header green + overlapping stats
           _buildHeaderWithStats(),
-          const SizedBox(height: 60), // Space for overlapping badge + room before Aktivitas
-
+          const SizedBox(
+            height: 60,
+          ), // Space for overlapping badge + room before Aktivitas
           // Aktivitas
           _buildSectionLabel('Aktivitas'),
           const SizedBox(height: 8),
           _buildMenuItem(
-            Icons.location_on_outlined, 
+            Icons.location_on_outlined,
             'Riwayat Kunjungan',
             onTap: () async {
               await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const HistoryPage(type: HistoryType.visit)),
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const HistoryPage(type: HistoryType.visit),
+                ),
               );
               _fetchAllStats();
             },
@@ -449,28 +464,35 @@ class _ProfilPageState extends State<ProfilPage> {
             onTap: () async {
               await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const SavedHotelsPage()),
+                MaterialPageRoute(
+                  builder: (context) => const SavedHotelsPage(),
+                ),
               );
               _fetchSavedCount(); // Refresh count when coming back
             },
           ),
           _buildMenuItem(
-            Icons.receipt_long_outlined, 
+            Icons.receipt_long_outlined,
             'Riwayat Pemesanan',
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const BookingHistoryPage()),
+                MaterialPageRoute(
+                  builder: (context) => const BookingHistoryPage(),
+                ),
               );
             },
           ),
           _buildMenuItem(
-            Icons.document_scanner_outlined, 
+            Icons.document_scanner_outlined,
             'Riwayat Scan AI',
             onTap: () async {
               await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const HistoryPage(type: HistoryType.scan)),
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const HistoryPage(type: HistoryType.scan),
+                ),
               );
               _fetchAllStats();
             },
@@ -482,8 +504,8 @@ class _ProfilPageState extends State<ProfilPage> {
           _buildSectionLabel('Pengaturan'),
           const SizedBox(height: 8),
           _buildMenuItem(
-            Icons.language, 
-            'Bahasa', 
+            Icons.language,
+            'Bahasa',
             trailing: 'Bahasa Indonesia',
             onTap: _showLanguagePicker,
           ),
@@ -498,20 +520,26 @@ class _ProfilPageState extends State<ProfilPage> {
             },
           ),
           _buildMenuItem(
-            Icons.lock_outlined, 
+            Icons.lock_outlined,
             'Ubah Kata Sandi',
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ChangePasswordPage()),
+                MaterialPageRoute(
+                  builder: (context) => const ChangePasswordPage(),
+                ),
               );
             },
           ),
-          _buildMenuItem(Icons.info_outlined, 'Tentang Delira', onTap: _showAboutDelira),
+          _buildMenuItem(
+            Icons.info_outlined,
+            'Tentang Delira',
+            onTap: _showAboutDelira,
+          ),
 
           const SizedBox(height: 24),
           _buildSignOutButton(),
-          const SizedBox(height: 100),
+          const SizedBox(height: 46),
         ],
       ),
     );
@@ -526,7 +554,12 @@ class _ProfilPageState extends State<ProfilPage> {
         // Green container
         Container(
           width: double.infinity,
-          padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 24.0, 24, 76), // extra bottom for overlap
+          padding: EdgeInsets.fromLTRB(
+            24,
+            MediaQuery.of(context).padding.top + 24.0,
+            24,
+            76,
+          ), // extra bottom for overlap
           decoration: const BoxDecoration(
             color: AppColors.primary,
             borderRadius: BorderRadius.only(
@@ -542,17 +575,19 @@ class _ProfilPageState extends State<ProfilPage> {
                   CircleAvatar(
                     radius: 34,
                     backgroundColor: Colors.white.withAlpha(60),
-                    backgroundImage: _avatarUrl != null ? NetworkImage(_avatarUrl!) : null,
-                    child: _avatarUrl == null 
-                      ? Text(
-                          _initials,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        )
-                      : null,
+                    backgroundImage: _avatarUrl != null
+                        ? NetworkImage(_avatarUrl!)
+                        : null,
+                    child: _avatarUrl == null
+                        ? Text(
+                            _initials,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          )
+                        : null,
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -588,7 +623,9 @@ class _ProfilPageState extends State<ProfilPage> {
                   onPressed: () async {
                     final updated = await Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const EditProfilPage()),
+                      MaterialPageRoute(
+                        builder: (context) => const EditProfilPage(),
+                      ),
                     );
                     if (updated == true) {
                       _fetchAllStats(); // Comprehensive refresh
@@ -660,7 +697,10 @@ class _ProfilPageState extends State<ProfilPage> {
           const SizedBox(height: 4),
           Text(
             label,
-            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ),
@@ -673,7 +713,12 @@ class _ProfilPageState extends State<ProfilPage> {
 
   Widget _buildSectionLabel(String label) {
     return Padding(
-      padding: const EdgeInsets.only(left: 24.0, right: 24.0, top: 16.0, bottom: 0),
+      padding: const EdgeInsets.only(
+        left: 24.0,
+        right: 24.0,
+        top: 16.0,
+        bottom: 0,
+      ),
       child: Text(
         label,
         style: const TextStyle(
@@ -686,7 +731,12 @@ class _ProfilPageState extends State<ProfilPage> {
   }
 
   /// Each menu item is its own rounded card with spacing
-  Widget _buildMenuItem(IconData icon, String label, {String? trailing, VoidCallback? onTap}) {
+  Widget _buildMenuItem(
+    IconData icon,
+    String label, {
+    String? trailing,
+    VoidCallback? onTap,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 2.0),
       child: Material(
@@ -719,17 +769,28 @@ class _ProfilPageState extends State<ProfilPage> {
                 Expanded(
                   child: Text(
                     label,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: AppColors.textPrimary),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                 ),
                 if (trailing != null) ...[
                   Text(
                     trailing,
-                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   const SizedBox(width: 4),
                 ],
-                const Icon(Icons.chevron_right, color: Colors.black38, size: 22),
+                const Icon(
+                  Icons.chevron_right,
+                  color: Colors.black38,
+                  size: 22,
+                ),
               ],
             ),
           ),
@@ -755,7 +816,10 @@ class _ProfilPageState extends State<ProfilPage> {
             ? const SizedBox(
                 width: 18,
                 height: 18,
-                child: CircularProgressIndicator(color: AppColors.danger, strokeWidth: 2),
+                child: CircularProgressIndicator(
+                  color: AppColors.danger,
+                  strokeWidth: 2,
+                ),
               )
             : const Icon(Icons.logout),
         label: const Text(
