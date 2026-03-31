@@ -96,15 +96,19 @@ class _DetailPageState extends State<DetailPage> {
           .from('destinasi_galeri')
           .select('*')
           .eq('destinasi_id', destinasi.id ?? '');
-      
+
       if (mounted) {
         setState(() {
-          _galleryImages = (res as List).map((e) => e['foto_url']?.toString() ?? '').toList();
+          _galleryImages = (res as List)
+              .map((e) => e['foto_url']?.toString() ?? '')
+              .toList();
           _isLoadingGallery = false;
-          
+
           if (_galleryImages.isEmpty) {
             debugPrint('LOG: Gallery is empty for ID: ${destinasi.id}');
-            debugPrint('LOG: Main fotoUtamaUrl fallback = ${destinasi.fotoUtamaUrl}');
+            debugPrint(
+              'LOG: Main fotoUtamaUrl fallback = ${destinasi.fotoUtamaUrl}',
+            );
           }
         });
       }
@@ -116,10 +120,7 @@ class _DetailPageState extends State<DetailPage> {
           _isLoadingGallery = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('DB_ERROR: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('DB_ERROR: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -128,7 +129,9 @@ class _DetailPageState extends State<DetailPage> {
   Future<void> _fetchLocation() async {
     final pos = await LocationUtils.getCurrentPosition();
     if (mounted) {
-      debugPrint('LOG: Destinasi Deskripsi Length: ${destinasi.deskripsi.length}');
+      debugPrint(
+        'LOG: Destinasi Deskripsi Length: ${destinasi.deskripsi.length}',
+      );
       setState(() {
         _currentPosition = pos;
       });
@@ -225,14 +228,15 @@ class _DetailPageState extends State<DetailPage> {
     final kategori = destinasi.kategori;
     final rating = destinasi.rating;
     final harga = destinasi.formattedPrice;
-    
-    final shareText = 'Cek tempat wisata keren ini di Delira!\n\n'
+
+    final shareText =
+        'Cek tempat wisata keren ini di Delira!\n\n'
         '🏞️ $nama\n'
         '🏷️ Kategori: $kategori\n'
         '⭐ Rating: $rating\n'
         '💸 Tiket: $harga\n\n'
         'Ayo liburan ke Medan dan jelajahi tempat-tempat seru lainnya di aplikasi Delira!';
-    
+
     Share.share(shareText);
   }
 
@@ -241,7 +245,8 @@ class _DetailPageState extends State<DetailPage> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light, // Keep light for image header
+        statusBarIconBrightness:
+            Brightness.light, // Keep light for image header
         systemNavigationBarColor: Colors.transparent, // Make it transparent
         systemNavigationBarIconBrightness: Brightness.dark,
         systemNavigationBarContrastEnforced: false,
@@ -279,7 +284,9 @@ class _DetailPageState extends State<DetailPage> {
                         _buildLocationSection(),
                         const SizedBox(height: 32),
                         _buildReviewsSection(),
-                        const SizedBox(height: 100), // Ruang bawah agar tidak tertutup bar
+                        const SizedBox(
+                          height: 100,
+                        ), // Ruang bawah agar tidak tertutup bar
                       ],
                     ),
                   ),
@@ -295,10 +302,11 @@ class _DetailPageState extends State<DetailPage> {
 
   Widget _buildSliverAppBar(BuildContext context) {
     // PREPEND BASE URL MANUALLY FOR DEBUGGING
-    const baseUrl = 'https://pdhvqcbnsncxkfspasjq.supabase.co/storage/v1/object/public/destinasi/';
-    
+    const baseUrl =
+        'https://pdhvqcbnsncxkfspasjq.supabase.co/storage/v1/object/public/destinasi/';
+
     final List<String> allImages = [];
-    
+
     // Add gallery images first
     for (var img in _galleryImages) {
       if (img.isNotEmpty) {
@@ -309,10 +317,11 @@ class _DetailPageState extends State<DetailPage> {
         }
       }
     }
-    
+
     // Fallback to main image if gallery is empty
     if (allImages.isEmpty) {
-      if (destinasi.fotoUtamaUrl != null && destinasi.fotoUtamaUrl!.isNotEmpty) {
+      if (destinasi.fotoUtamaUrl != null &&
+          destinasi.fotoUtamaUrl!.isNotEmpty) {
         final mainImg = destinasi.fotoUtamaUrl!;
         if (mainImg.startsWith('http')) {
           allImages.add(mainImg);
@@ -332,12 +341,14 @@ class _DetailPageState extends State<DetailPage> {
       elevation: _isAppBarCollapsed ? 2 : 0,
       centerTitle: true,
       leading: Padding(
-        padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 8.0, left: 12.0, bottom: 8.0),
+        padding: const EdgeInsets.all(8.0),
         child: CircleAvatar(
-          backgroundColor: _isAppBarCollapsed ? Colors.transparent : Colors.black26,
+          backgroundColor: _isAppBarCollapsed
+              ? Colors.transparent
+              : Colors.black26,
           child: IconButton(
             icon: Icon(
-              Icons.arrow_back, 
+              Icons.arrow_back,
               color: _isAppBarCollapsed ? AppColors.textPrimary : Colors.white,
               size: 20,
             ),
@@ -359,15 +370,19 @@ class _DetailPageState extends State<DetailPage> {
       ),
       actions: [
         Padding(
-          padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 8.0, right: 12.0, bottom: 8.0),
+          padding: const EdgeInsets.all(8.0),
           child: CircleAvatar(
-            backgroundColor: _isAppBarCollapsed ? Colors.transparent : Colors.black26,
+            backgroundColor: _isAppBarCollapsed
+                ? Colors.transparent
+                : Colors.black26,
             child: IconButton(
               icon: Icon(
-                _isFavorited ? Icons.favorite : Icons.favorite_border, 
-                color: _isFavorited 
-                    ? Colors.red 
-                    : (_isAppBarCollapsed ? AppColors.textPrimary : Colors.white),
+                _isFavorited ? Icons.favorite : Icons.favorite_border,
+                color: _isFavorited
+                    ? Colors.red
+                    : (_isAppBarCollapsed
+                          ? AppColors.textPrimary
+                          : Colors.white),
                 size: 20,
               ),
               onPressed: _toggleFavorite,
@@ -377,11 +392,15 @@ class _DetailPageState extends State<DetailPage> {
         Padding(
           padding: const EdgeInsets.only(top: 8, bottom: 8, right: 16),
           child: CircleAvatar(
-            backgroundColor: _isAppBarCollapsed ? Colors.transparent : Colors.black26,
+            backgroundColor: _isAppBarCollapsed
+                ? Colors.transparent
+                : Colors.black26,
             child: IconButton(
               icon: Icon(
-                Icons.share_outlined, 
-                color: _isAppBarCollapsed ? AppColors.textPrimary : Colors.white,
+                Icons.share_outlined,
+                color: _isAppBarCollapsed
+                    ? AppColors.textPrimary
+                    : Colors.white,
                 size: 20,
               ),
               onPressed: _shareDestinasi,
@@ -389,23 +408,22 @@ class _DetailPageState extends State<DetailPage> {
           ),
         ),
       ],
-      shape: _isAppBarCollapsed 
+      shape: _isAppBarCollapsed
           ? const RoundedRectangleBorder(
               borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
             )
           : null,
-      flexibleSpace: FlexibleSpaceBar(
-        background: _buildHeaderContent(),
-      ),
+      flexibleSpace: FlexibleSpaceBar(background: _buildHeaderContent()),
     );
   }
 
   Widget _buildHeaderContent() {
     // PREPEND BASE URL MANUALLY FOR DEBUGGING
-    const baseUrl = 'https://pdhvqcbnsncxkfspasjq.supabase.co/storage/v1/object/public/destinasi/';
-    
+    const baseUrl =
+        'https://pdhvqcbnsncxkfspasjq.supabase.co/storage/v1/object/public/destinasi/';
+
     final List<String> allImages = [];
-    
+
     // Add gallery images first
     for (var img in _galleryImages) {
       if (img.isNotEmpty) {
@@ -416,10 +434,11 @@ class _DetailPageState extends State<DetailPage> {
         }
       }
     }
-    
+
     // Fallback to main image if gallery is empty
     if (allImages.isEmpty) {
-      if (destinasi.fotoUtamaUrl != null && destinasi.fotoUtamaUrl!.isNotEmpty) {
+      if (destinasi.fotoUtamaUrl != null &&
+          destinasi.fotoUtamaUrl!.isNotEmpty) {
         final mainImg = destinasi.fotoUtamaUrl!;
         if (mainImg.startsWith('http')) {
           allImages.add(mainImg);
@@ -434,8 +453,11 @@ class _DetailPageState extends State<DetailPage> {
     }
 
     if (_galleryError != null || (allImages.isEmpty)) {
-      final bool mainImgMissing = destinasi.fotoUtamaUrl == null || destinasi.fotoUtamaUrl!.isEmpty;
-      final errorMsg = _galleryError ?? (mainImgMissing ? 'Foto Utama juga tidak valid' : 'Galeri Kosong');
+      final bool mainImgMissing =
+          destinasi.fotoUtamaUrl == null || destinasi.fotoUtamaUrl!.isEmpty;
+      final errorMsg =
+          _galleryError ??
+          (mainImgMissing ? 'Foto Utama juga tidak valid' : 'Galeri Kosong');
       return Container(
         color: Colors.grey[200],
         child: Column(
@@ -448,7 +470,10 @@ class _DetailPageState extends State<DetailPage> {
               child: Text(
                 'ERROR: $errorMsg',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -456,7 +481,9 @@ class _DetailPageState extends State<DetailPage> {
               onPressed: _fetchGallery,
               icon: const Icon(Icons.refresh),
               label: const Text('Coba Lagi'),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+              ),
             ),
           ],
         ),
@@ -475,7 +502,7 @@ class _DetailPageState extends State<DetailPage> {
           itemCount: allImages.length,
           itemBuilder: (context, index) {
             final imageUrl = allImages[index];
-            
+
             return Image.network(
               imageUrl,
               fit: BoxFit.cover,
@@ -485,19 +512,26 @@ class _DetailPageState extends State<DetailPage> {
                 return Center(
                   child: CircularProgressIndicator(
                     value: loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                        ? loadingProgress.cumulativeBytesLoaded /
+                              loadingProgress.expectedTotalBytes!
                         : null,
                   ),
                 );
               },
               errorBuilder: (context, error, stackTrace) {
-                debugPrint('LOG: Render Error for URL: $imageUrl, Error: $error');
+                debugPrint(
+                  'LOG: Render Error for URL: $imageUrl, Error: $error',
+                );
                 return Container(
                   color: Colors.grey[200],
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.broken_image, size: 48, color: Colors.grey),
+                      const Icon(
+                        Icons.broken_image,
+                        size: 48,
+                        color: Colors.grey,
+                      ),
                       const SizedBox(height: 8),
                       Text(
                         'Render Error: $error',
@@ -525,7 +559,9 @@ class _DetailPageState extends State<DetailPage> {
                   margin: const EdgeInsets.symmetric(horizontal: 4.0),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(4),
-                    color: Colors.white.withAlpha(_currentPage == entry.key ? 255 : 120),
+                    color: Colors.white.withAlpha(
+                      _currentPage == entry.key ? 255 : 120,
+                    ),
                   ),
                 );
               }).toList(),
@@ -536,7 +572,6 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   // Menghapus _buildImageHeader yang lama karena sudah dipindah ke _buildSliverAppBar
-
 
   Widget _buildTitleSection() {
     final bool isOpen = destinasi.isOpenNow();
@@ -572,7 +607,10 @@ class _DetailPageState extends State<DetailPage> {
                 ),
               ),
               const SizedBox(width: 8),
-              const Text('•', style: TextStyle(color: AppColors.primary, fontSize: 12)),
+              const Text(
+                '•',
+                style: TextStyle(color: AppColors.primary, fontSize: 12),
+              ),
               const SizedBox(width: 8),
               Text(
                 isOpen ? 'BUKA' : 'TUTUP',
@@ -605,12 +643,7 @@ class _DetailPageState extends State<DetailPage> {
           'Jarak',
           Colors.green,
         ),
-        _buildStatBox(
-          Icons.history,
-          '1906',
-          'Tahun',
-          Colors.grey,
-        ),
+        _buildStatBox(Icons.history, '1906', 'Tahun', Colors.grey),
       ],
     );
   }
@@ -653,10 +686,10 @@ class _DetailPageState extends State<DetailPage> {
 
   Widget _buildDescriptionSection() {
     final bool hasDeskripsi = destinasi.deskripsi.trim().isNotEmpty;
-    final String deskripsiText = hasDeskripsi 
-        ? destinasi.deskripsi 
+    final String deskripsiText = hasDeskripsi
+        ? destinasi.deskripsi
         : 'Informasi deskripsi belum tersedia untuk ${destinasi.nama}.';
-    
+
     // Tampilkan tombol hanya jika teks cukup panjang (estimasi > 160 karakter untuk 4 baris)
     final bool isTextLong = destinasi.deskripsi.length > 160;
 
@@ -675,7 +708,9 @@ class _DetailPageState extends State<DetailPage> {
             deskripsiText,
             style: const TextStyle(color: AppColors.textSecondary, height: 1.6),
             maxLines: _isDescriptionExpanded ? null : 4,
-            overflow: _isDescriptionExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+            overflow: _isDescriptionExpanded
+                ? TextOverflow.visible
+                : TextOverflow.ellipsis,
           ),
         ),
         if (hasDeskripsi && isTextLong) ...[
@@ -742,11 +777,7 @@ class _DetailPageState extends State<DetailPage> {
                 onTap: _launchNavigation,
               ),
               const Divider(height: 32),
-              _buildInfoRow(
-                Icons.phone_outlined,
-                'Kontak',
-                '+62 61 4514441',
-              ),
+              _buildInfoRow(Icons.phone_outlined, 'Kontak', '+62 61 4514441'),
             ],
           ),
         ),
@@ -754,7 +785,13 @@ class _DetailPageState extends State<DetailPage> {
     );
   }
 
-  Widget _buildInfoRow(IconData icon, String title, String subtitle, {bool showAction = false, VoidCallback? onTap}) {
+  Widget _buildInfoRow(
+    IconData icon,
+    String title,
+    String subtitle, {
+    bool showAction = false,
+    VoidCallback? onTap,
+  }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -790,7 +827,11 @@ class _DetailPageState extends State<DetailPage> {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            const Icon(Icons.chevron_right, color: AppColors.primary, size: 14),
+                            const Icon(
+                              Icons.chevron_right,
+                              color: AppColors.primary,
+                              size: 14,
+                            ),
                           ],
                         ),
                     ],
@@ -813,7 +854,7 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   Widget _buildGallerySection() {
-    final List<String> allImages = _galleryImages.isNotEmpty 
+    final List<String> allImages = _galleryImages.isNotEmpty
         ? _galleryImages.map((img) {
             if (img.startsWith('http')) return img;
             const baseUrl = 'https://pdhvqcbnsncxkfspasjq.supabase.co';
@@ -841,9 +882,7 @@ class _DetailPageState extends State<DetailPage> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   image: DecorationImage(
-                    image: NetworkImage(
-                      allImages[index],
-                    ),
+                    image: NetworkImage(allImages[index]),
                     fit: BoxFit.cover,
                   ),
                 ),
@@ -887,7 +926,7 @@ class _DetailPageState extends State<DetailPage> {
 
   Future<void> _launchNavigation() async {
     final url = Uri.parse(
-      'https://www.google.com/maps/search/?api=1&query=${destinasi.latitude},${destinasi.longitude}'
+      'https://www.google.com/maps/search/?api=1&query=${destinasi.latitude},${destinasi.longitude}',
     );
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
@@ -1014,7 +1053,11 @@ class _DetailPageState extends State<DetailPage> {
             child: const Center(
               child: Column(
                 children: [
-                  Icon(Icons.rate_review_outlined, size: 48, color: Colors.grey),
+                  Icon(
+                    Icons.rate_review_outlined,
+                    size: 48,
+                    color: Colors.grey,
+                  ),
                   SizedBox(height: 12),
                   Text(
                     'Belum ada ulasan untuk tempat ini.',
@@ -1032,7 +1075,8 @@ class _DetailPageState extends State<DetailPage> {
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _ulasanList.length,
             separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, index) => _buildReviewCard(_ulasanList[index]),
+            itemBuilder: (context, index) =>
+                _buildReviewCard(_ulasanList[index]),
           ),
       ],
     );
@@ -1067,7 +1111,9 @@ class _DetailPageState extends State<DetailPage> {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 2.0),
                       child: Icon(
-                        index < _selectedRating ? Icons.star : Icons.star_border,
+                        index < _selectedRating
+                            ? Icons.star
+                            : Icons.star_border,
                         color: Colors.orange,
                         size: 28,
                       ),
@@ -1101,7 +1147,9 @@ class _DetailPageState extends State<DetailPage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 elevation: 0,
               ),
@@ -1109,9 +1157,15 @@ class _DetailPageState extends State<DetailPage> {
                   ? const SizedBox(
                       height: 20,
                       width: 20,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
                     )
-                  : const Text('Kirim Ulasan', style: TextStyle(fontWeight: FontWeight.bold)),
+                  : const Text(
+                      'Kirim Ulasan',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
             ),
           ),
         ],
@@ -1123,7 +1177,11 @@ class _DetailPageState extends State<DetailPage> {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Silakan login terlebih dahulu untuk memberikan ulasan.')),
+        const SnackBar(
+          content: Text(
+            'Silakan login terlebih dahulu untuk memberikan ulasan.',
+          ),
+        ),
       );
       return;
     }
@@ -1162,16 +1220,17 @@ class _DetailPageState extends State<DetailPage> {
       debugPrint('SUBMIT_ULASAN_ERROR: $e');
       if (mounted) {
         setState(() => _isSubmittingUlasan = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal mengirim ulasan: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Gagal mengirim ulasan: $e')));
       }
     }
   }
 
   Widget _buildReviewCard(Map<String, dynamic> ulasanData) {
     final profiles = ulasanData['profiles'] as Map<String, dynamic>?;
-    final String name = profiles?['nama_lengkap']?.toString() ?? 'Pengguna Delira';
+    final String name =
+        profiles?['nama_lengkap']?.toString() ?? 'Pengguna Delira';
     final String comment = ulasanData['ulasan']?.toString() ?? '-';
     final int rating = (ulasanData['rating'] as num?)?.toInt() ?? 5;
 
@@ -1208,7 +1267,9 @@ class _DetailPageState extends State<DetailPage> {
                       5,
                       (i) => Icon(
                         Icons.star,
-                        color: i < rating ? Colors.orange : Colors.grey.shade300,
+                        color: i < rating
+                            ? Colors.orange
+                            : Colors.grey.shade300,
                         size: 14,
                       ),
                     ),
@@ -1220,7 +1281,10 @@ class _DetailPageState extends State<DetailPage> {
           const SizedBox(height: 12),
           Text(
             comment,
-            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+            ),
           ),
         ],
       ),
@@ -1230,7 +1294,7 @@ class _DetailPageState extends State<DetailPage> {
   Widget _buildBottomActionBar(BuildContext context) {
     // Check if bottom padding exists (3-button nav or gestures)
     final bottomPadding = MediaQuery.of(context).padding.bottom;
-    
+
     return Align(
       alignment: Alignment.bottomCenter,
       child: ClipRect(
@@ -1239,131 +1303,138 @@ class _DetailPageState extends State<DetailPage> {
           child: Container(
             decoration: BoxDecoration(
               color: Colors.white.withAlpha(200), // Slightly translucent white
-              border: Border(top: BorderSide(color: Colors.black.withAlpha(20))),
+              border: Border(
+                top: BorderSide(color: Colors.black.withAlpha(20)),
+              ),
             ),
             child: Padding(
               padding: EdgeInsets.fromLTRB(
-                16, 
+                16,
                 6, // Jarak nyaman sesuai preferensi di hotel detail
-                16, 
+                16,
                 bottomPadding + 4, // Ruang aman bawah untuk navigasi sistem
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-          // AI Guide Button
-          Expanded(
-            flex: 1,
-            child: SizedBox(
-              height: 52,
-              child: OutlinedButton.icon(
-                onPressed: () {},
-                icon: const Icon(
-                  Icons.smart_toy_outlined,
-                  size: 16,
-                  color: Color(0xFF1A6B4A),
-                ),
-                label: const Text(
-                  'AI Guide',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF1A6B4A),
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF1A6B4A)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Hotel Button
-          Expanded(
-            flex: 1,
-            child: SizedBox(
-              height: 52,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  if (destinasi.latitude != 0 && destinasi.longitude != 0) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => HotelPage(
-                          destLat: destinasi.latitude,
-                          destLng: destinasi.longitude,
-                          destName: destinasi.nama,
+                  // AI Guide Button
+                  Expanded(
+                    flex: 1,
+                    child: SizedBox(
+                      height: 52,
+                      child: OutlinedButton.icon(
+                        onPressed: () {},
+                        icon: const Icon(
+                          Icons.smart_toy_outlined,
+                          size: 16,
+                          color: Color(0xFF1A6B4A),
+                        ),
+                        label: const Text(
+                          'AI Guide',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF1A6B4A),
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFF1A6B4A)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
                         ),
                       ),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Lokasi Destinasi tidak valid'),
-                        backgroundColor: Colors.red,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Hotel Button
+                  Expanded(
+                    flex: 1,
+                    child: SizedBox(
+                      height: 52,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          if (destinasi.latitude != 0 &&
+                              destinasi.longitude != 0) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => HotelPage(
+                                  destLat: destinasi.latitude,
+                                  destLng: destinasi.longitude,
+                                  destName: destinasi.nama,
+                                ),
+                              ),
+                            );
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Lokasi Destinasi tidak valid'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(
+                          Icons.hotel_outlined,
+                          size: 16,
+                          color: Color(0xFF1A6B4A),
+                        ),
+                        label: const Text(
+                          'Hotel Dekat',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF1A6B4A),
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFF1A6B4A)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                        ),
                       ),
-                    );
-                  }
-                },
-                icon: const Icon(
-                  Icons.hotel_outlined,
-                  size: 16,
-                  color: Color(0xFF1A6B4A),
-                ),
-                label: const Text(
-                  'Hotel Dekat',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF1A6B4A),
-                    fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  maxLines: 1,
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF1A6B4A)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  const SizedBox(width: 8),
+                  // Navigasi Button
+                  Expanded(
+                    flex: 1,
+                    child: SizedBox(
+                      height: 52,
+                      child: ElevatedButton.icon(
+                        onPressed: _launchNavigation,
+                        icon: const Icon(
+                          Icons.explore,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                        label: const Text(
+                          'Navigasi',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1A6B4A),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Navigasi Button
-          Expanded(
-            flex: 1,
-            child: SizedBox(
-              height: 52,
-              child: ElevatedButton.icon(
-                onPressed: _launchNavigation,
-                icon: const Icon(Icons.explore, size: 16, color: Colors.white),
-                label: const Text(
-                  'Navigasi',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 1,
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A6B4A),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  elevation: 0,
-                ),
-              ),
-            ),
-          ),
-        ],
+                ],
               ),
             ),
           ),

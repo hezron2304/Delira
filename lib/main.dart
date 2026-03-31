@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:delira/login_page.dart';
-import 'package:delira/home_page.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:delira/theme/app_colors.dart';
+import 'package:delira/splash_page.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
+  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+
   // Inisialisasi Environment Variables (API Key)
   await dotenv.load(fileName: ".env");
 
@@ -20,17 +21,18 @@ Future<void> main() async {
   );
 
   // >>> GLOBAL SYSTEM UI / EDGE-TO-EDGE FIX <<<
-  // Mengaktifkan mode layar penuh (Edge-to-Edge) sehingga area Status Bar (atas) 
+  // Mengaktifkan mode layar penuh (Edge-to-Edge) sehingga area Status Bar (atas)
   // dan Navigation Bar (bawah - Jendela/Home/Back) menjadi transparan mengikuti warna halaman.
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent, 
-      statusBarIconBrightness: Brightness.dark, 
-      systemNavigationBarColor: AppColors.surface, // Background-matching default
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      systemNavigationBarColor:
+          AppColors.surface, // Background-matching default
       systemNavigationBarIconBrightness: Brightness.dark,
-      systemNavigationBarContrastEnforced: false, 
+      systemNavigationBarContrastEnforced: false,
     ),
   );
 
@@ -42,8 +44,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final session = Supabase.instance.client.auth.currentSession;
-
     return MaterialApp(
       title: 'Delira',
       debugShowCheckedModeBanner: false,
@@ -52,7 +52,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
         textTheme: GoogleFonts.interTextTheme(Theme.of(context).textTheme),
       ),
-      home: session != null ? const HomePage() : const LoginPage(),
+      home: const SplashPage(),
     );
   }
 }

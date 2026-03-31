@@ -77,11 +77,31 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-
   String _formatDateWithDay(DateTime d) {
-    const days = ['', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+    const days = [
+      '',
+      'Senin',
+      'Selasa',
+      'Rabu',
+      'Kamis',
+      'Jumat',
+      'Sabtu',
+      'Minggu',
+    ];
     const months = [
-      '', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'
+      '',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agu',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des',
     ];
     return '${days[d.weekday]}, ${d.day} ${months[d.month]} ${d.year}';
   }
@@ -92,7 +112,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
     if (session == null || session.isExpired || user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sesi telah habis, silakan masuk kembali.')),
+        const SnackBar(
+          content: Text('Sesi telah habis, silakan masuk kembali.'),
+        ),
       );
       Navigator.pushAndRemoveUntil(
         context,
@@ -151,7 +173,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
     debugPrint("Role: ${user.role}");
 
     try {
-      await Supabase.instance.client.schema('public').from('booking').insert(payload);
+      await Supabase.instance.client
+          .schema('public')
+          .from('booking')
+          .insert(payload);
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
@@ -168,9 +193,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
         );
       } else {
         debugPrint("Unknown Exception: $e");
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
       return;
     }
@@ -200,7 +225,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
     }
 
     // 6. Online payments (Pakasir)
-    final paymentUrl = 'https://app.pakasir.com/pay/delira/$total?order_id=$orderId';
+    final paymentUrl =
+        'https://app.pakasir.com/pay/delira/$total?order_id=$orderId';
 
     if (!mounted) return;
 
@@ -222,8 +248,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-
-
   void _applyPromo() {
     FocusScope.of(context).unfocus();
     final code = _promoController.text.trim().toUpperCase();
@@ -239,9 +263,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
         const SnackBar(content: Text('Kode promo berhasil digunakan!')),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Kode promo tidak valid')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Kode promo tidak valid')));
     }
   }
 
@@ -255,7 +279,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text('Checkout', style: GoogleFonts.inter(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: Text(
+          'Checkout',
+          style: GoogleFonts.inter(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
@@ -265,7 +295,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.only(left: 20, right: 20, top: 20, bottom: 100),
+        padding: const EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: 130,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -284,11 +319,15 @@ class _CheckoutPageState extends State<CheckoutPage> {
         ),
       ),
       bottomSheet: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 50),
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
-            BoxShadow(color: Colors.black.withAlpha(15), blurRadius: 10, offset: const Offset(0, -4)),
+            BoxShadow(
+              color: Colors.black.withAlpha(15),
+              blurRadius: 10,
+              offset: const Offset(0, -4),
+            ),
           ],
         ),
         child: SafeArea(
@@ -300,9 +339,22 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Total Pembayaran', style: GoogleFonts.inter(color: Colors.grey, fontSize: 12)),
+                    Text(
+                      'Total Pembayaran',
+                      style: GoogleFonts.inter(
+                        color: Colors.grey,
+                        fontSize: 12,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text('Rp ${_formatRupiah(totalAmount)}', style: GoogleFonts.inter(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 18)),
+                    Text(
+                      'Rp ${_formatRupiah(totalAmount)}',
+                      style: GoogleFonts.inter(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -310,15 +362,30 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 onPressed: _isLoading ? null : _handlePayment,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   elevation: 0,
                 ),
                 child: _isLoading
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
                     : Text(
                         'Bayar Sekarang →',
-                        style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold),
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
               ),
             ],
@@ -339,7 +406,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Info Pesanan', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(
+            'Info Pesanan',
+            style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -349,8 +419,20 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(widget.hotelName, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14)),
-                    Text(widget.roomType, style: GoogleFonts.inter(color: Colors.grey, fontSize: 13)),
+                    Text(
+                      widget.hotelName,
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      widget.roomType,
+                      style: GoogleFonts.inter(
+                        color: Colors.grey,
+                        fontSize: 13,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -363,7 +445,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
           const SizedBox(height: 8),
           _buildInfoRow('Jumlah malam', '${widget.nights} malam'),
           const SizedBox(height: 8),
-          _buildInfoRow('Kamar & Tamu', '${widget.rooms} Kamar, ${widget.adults} Dewasa${widget.children > 0 ? ', ${widget.children} Anak' : ''}'),
+          _buildInfoRow(
+            'Kamar & Tamu',
+            '${widget.rooms} Kamar, ${widget.adults} Dewasa${widget.children > 0 ? ', ${widget.children} Anak' : ''}',
+          ),
         ],
       ),
     );
@@ -380,13 +465,30 @@ class _CheckoutPageState extends State<CheckoutPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Data Tamu', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(
+            'Data Tamu',
+            style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           const SizedBox(height: 16),
-          _buildTextField(_nameController, 'Nama lengkap tamu', Icons.person_outline),
+          _buildTextField(
+            _nameController,
+            'Nama lengkap tamu',
+            Icons.person_outline,
+          ),
           const SizedBox(height: 12),
-          _buildTextField(_phoneController, 'Nomor telepon', Icons.phone_outlined, type: TextInputType.phone),
+          _buildTextField(
+            _phoneController,
+            'Nomor telepon',
+            Icons.phone_outlined,
+            type: TextInputType.phone,
+          ),
           const SizedBox(height: 12),
-          _buildTextField(_emailController, 'Alamat email', Icons.email_outlined, type: TextInputType.emailAddress),
+          _buildTextField(
+            _emailController,
+            'Alamat email',
+            Icons.email_outlined,
+            type: TextInputType.emailAddress,
+          ),
           const SizedBox(height: 8),
           Theme(
             data: ThemeData(unselectedWidgetColor: Colors.grey),
@@ -394,8 +496,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
               contentPadding: EdgeInsets.zero,
               controlAffinity: ListTileControlAffinity.leading,
               activeColor: AppColors.primary,
-              title: Text('Simpan data untuk pemesanan berikutnya', 
-                style: GoogleFonts.inter(fontSize: 13, color: Colors.grey.shade700)),
+              title: Text(
+                'Simpan data untuk pemesanan berikutnya',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: Colors.grey.shade700,
+                ),
+              ),
               value: _saveGuestData,
               onChanged: (val) => setState(() => _saveGuestData = val ?? false),
             ),
@@ -416,7 +523,10 @@ class _CheckoutPageState extends State<CheckoutPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Permintaan Khusus', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(
+            'Permintaan Khusus',
+            style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           const SizedBox(height: 16),
           TextField(
             controller: _specialRequestController,
@@ -425,7 +535,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
             decoration: InputDecoration(
               hintText: 'Contoh: kamar lantai tinggi, pillow extra, dll',
               hintStyle: GoogleFonts.inter(color: Colors.grey, fontSize: 13),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               contentPadding: const EdgeInsets.all(16),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -449,11 +561,20 @@ class _CheckoutPageState extends State<CheckoutPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Kode Promo', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(
+            'Kode Promo',
+            style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           const SizedBox(height: 16),
           Row(
             children: [
-              Expanded(child: _buildTextField(_promoController, 'Masukkan kode promo', Icons.local_offer_outlined)),
+              Expanded(
+                child: _buildTextField(
+                  _promoController,
+                  'Masukkan kode promo',
+                  Icons.local_offer_outlined,
+                ),
+              ),
               const SizedBox(width: 8),
               SizedBox(
                 height: 52,
@@ -461,10 +582,18 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   onPressed: _applyPromo,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     elevation: 0,
                   ),
-                  child: Text('Pakai', style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    'Pakai',
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -474,8 +603,14 @@ class _CheckoutPageState extends State<CheckoutPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('$_appliedPromo - Diskon Rp ${_formatRupiah(_promoDiscount)}', 
-                  style: GoogleFonts.inter(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 13)),
+                Text(
+                  '$_appliedPromo - Diskon Rp ${_formatRupiah(_promoDiscount)}',
+                  style: GoogleFonts.inter(
+                    color: Colors.green,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
                 TextButton(
                   onPressed: () {
                     setState(() {
@@ -483,11 +618,18 @@ class _CheckoutPageState extends State<CheckoutPage> {
                       _promoDiscount = 0;
                     });
                   },
-                  child: Text('Hapus', style: GoogleFonts.inter(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13)),
+                  child: Text(
+                    'Hapus',
+                    style: GoogleFonts.inter(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
                 ),
               ],
-            )
-          ]
+            ),
+          ],
         ],
       ),
     );
@@ -523,7 +665,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Text('Metode Pembayaran', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+            child: Text(
+              'Metode Pembayaran',
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
           ),
           const SizedBox(height: 12),
           ...options.map((opt) {
@@ -531,9 +679,15 @@ class _CheckoutPageState extends State<CheckoutPage> {
             return Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.primary.withAlpha(12) : Colors.transparent,
+                color: isSelected
+                    ? AppColors.primary.withAlpha(12)
+                    : Colors.transparent,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: isSelected ? AppColors.primary : Colors.grey.withAlpha(60)),
+                border: Border.all(
+                  color: isSelected
+                      ? AppColors.primary
+                      : Colors.grey.withAlpha(60),
+                ),
               ),
               child: RadioListTile<String>(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12),
@@ -541,9 +695,22 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 value: opt['val'] as String,
                 groupValue: _selectedPayment,
                 onChanged: (val) => setState(() => _selectedPayment = val!),
-                title: Text(opt['title'] as String, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14)),
-                subtitle: Text(opt['sub'] as String, style: GoogleFonts.inter(color: Colors.grey, fontSize: 12)),
-                secondary: Icon(opt['ic'] as IconData, color: opt['c'] as Color, size: 28),
+                title: Text(
+                  opt['title'] as String,
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                subtitle: Text(
+                  opt['sub'] as String,
+                  style: GoogleFonts.inter(color: Colors.grey, fontSize: 12),
+                ),
+                secondary: Icon(
+                  opt['ic'] as IconData,
+                  color: opt['c'] as Color,
+                  size: 28,
+                ),
               ),
             );
           }),
@@ -563,9 +730,15 @@ class _CheckoutPageState extends State<CheckoutPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Ringkasan Biaya', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(
+            'Ringkasan Biaya',
+            style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           const SizedBox(height: 16),
-          _buildInfoRow('Harga kamar × ${widget.nights} malam', 'Rp ${_formatRupiah(subtotal)}'),
+          _buildInfoRow(
+            'Harga kamar × ${widget.nights} malam',
+            'Rp ${_formatRupiah(subtotal)}',
+          ),
           const SizedBox(height: 8),
           _buildInfoRow('Pajak (11%)', 'Rp ${_formatRupiah(tax)}'),
           const SizedBox(height: 8),
@@ -575,8 +748,22 @@ class _CheckoutPageState extends State<CheckoutPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Diskon promo', style: GoogleFonts.inter(color: Colors.green, fontSize: 13, fontWeight: FontWeight.w500)),
-                Text('- Rp ${_formatRupiah(_promoDiscount)}', style: GoogleFonts.inter(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 13)),
+                Text(
+                  'Diskon promo',
+                  style: GoogleFonts.inter(
+                    color: Colors.green,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Text(
+                  '- Rp ${_formatRupiah(_promoDiscount)}',
+                  style: GoogleFonts.inter(
+                    color: Colors.green,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
               ],
             ),
           ],
@@ -587,8 +774,21 @@ class _CheckoutPageState extends State<CheckoutPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Total', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16)),
-              Text('Rp ${_formatRupiah(total)}', style: GoogleFonts.inter(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 18)),
+              Text(
+                'Total',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              Text(
+                'Rp ${_formatRupiah(total)}',
+                style: GoogleFonts.inter(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
             ],
           ),
         ],
@@ -600,13 +800,24 @@ class _CheckoutPageState extends State<CheckoutPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: GoogleFonts.inter(color: Colors.grey.shade600, fontSize: 13)),
-        Text(value, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13)),
+        Text(
+          label,
+          style: GoogleFonts.inter(color: Colors.grey.shade600, fontSize: 13),
+        ),
+        Text(
+          value,
+          style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
+        ),
       ],
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String hint, IconData icon, {TextInputType? type}) {
+  Widget _buildTextField(
+    TextEditingController controller,
+    String hint,
+    IconData icon, {
+    TextInputType? type,
+  }) {
     return TextField(
       controller: controller,
       keyboardType: type,
@@ -616,8 +827,14 @@ class _CheckoutPageState extends State<CheckoutPage> {
         hintStyle: GoogleFonts.inter(color: Colors.grey, fontSize: 13),
         prefixIcon: Icon(icon, color: Colors.grey, size: 20),
         contentPadding: const EdgeInsets.symmetric(vertical: 16),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.grey)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.withAlpha(70))),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.grey),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.withAlpha(70)),
+        ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.primary),
