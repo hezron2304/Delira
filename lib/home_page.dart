@@ -12,6 +12,7 @@ import 'package:delira/theme/app_colors.dart';
 import 'package:delira/models/destinasi.dart';
 import 'package:delira/search_page.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:delira/notifikasi_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -204,47 +205,86 @@ class _HomePageState extends State<HomePage> {
       ),
       child: Column(
         children: [
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _currentIndex = 3; // Navigate to Profil tab
-              });
-            },
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    image: _avatarUrl != null 
-                        ? DecorationImage(image: NetworkImage(_avatarUrl!), fit: BoxFit.cover) 
-                        : null,
-                  ),
-                  child: _avatarUrl == null 
-                    ? Center(
-                        child: Text(
-                          _userInitials, 
-                          style: const TextStyle(
-                            color: AppColors.primary, 
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                          ),
-                        ),
-                      )
-                    : null,
-                ),
-                const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _currentIndex = 3; // Navigate to Profil tab
+                  });
+                },
+                child: Row(
                   children: [
-                    Text('Selamat datang 👋', style: TextStyle(color: Colors.white.withAlpha(200), fontSize: 13)),
-                    Text(_userName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        image: _avatarUrl != null 
+                            ? DecorationImage(image: NetworkImage(_avatarUrl!), fit: BoxFit.cover) 
+                            : null,
+                      ),
+                      child: _avatarUrl == null 
+                        ? Center(
+                            child: Text(
+                              _userInitials, 
+                              style: const TextStyle(
+                                color: AppColors.primary, 
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                            ),
+                          )
+                        : null,
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Selamat datang 👋', style: TextStyle(color: Colors.white.withAlpha(200), fontSize: 13)),
+                        Text(_userName, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                      ],
+                    ),
                   ],
                 ),
-              ],
-            ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const NotifikasiPage()),
+                  );
+                },
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withAlpha(50),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      const Icon(Icons.notifications_outlined, color: Colors.white, size: 24),
+                      Positioned(
+                        right: 8,
+                        top: 8,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Colors.redAccent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 24),
           Container(
