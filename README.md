@@ -91,9 +91,9 @@ Delira follows a modern, "Nature-First" design philosophy with a primary color p
 
 ---
 
-## 👨‍💻 Team MedanXplore
+## 👨‍💻 Team Delira
 
 This project was developed for **Lomba Mobile Apps (Delira)**.
 
 ---
-*© 2026 Delira (Delira) Team - Discovering Medan, Redefined.*
+*© 2026 Delira Team - Discovering Medan, Redefined.*
