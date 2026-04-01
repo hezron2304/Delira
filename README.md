@@ -1,6 +1,6 @@
-# 🌴 Delira (MedanXplore)
+# 🌴 Delira
 
-**Delira** (MedanXplore) is a premium, all-in-one mobile application designed to elevate the tourism experience in Medan, Indonesia. Built with Flutter and powered by AI, Delira provides travelers with a seamless journey from discovery and booking to on-the-ground exploration.
+**Delira**  is a premium, all-in-one mobile application designed to elevate the tourism experience in Medan, Indonesia. Built with Flutter and powered by AI, Delira provides travelers with a seamless journey from discovery and booking to on-the-ground exploration.
 
 ---
 
@@ -93,7 +93,7 @@ Delira follows a modern, "Nature-First" design philosophy with a primary color p
 
 ## 👨‍💻 Team MedanXplore
 
-This project was developed for **Lomba Mobile Apps (MedanXplore)**.
+This project was developed for **Lomba Mobile Apps (Delira)**.
 
 ---
-*© 2026 Delira (MedanXplore) Team - Discovering Medan, Redefined.*
+*© 2026 Delira (Delira) Team - Discovering Medan, Redefined.*
