@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:delira/room_selection_page.dart';
+import 'package:delira/map_page.dart';
 import 'package:delira/theme/app_colors.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:delira/utils/location_utils.dart';
 
 class HotelDetailPage extends StatefulWidget {
@@ -51,7 +53,86 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
     _fetchFavoriteStatus();
     _fetchLocation();
     _fetchUlasan();
+    _recordVisit();
     _scrollController.addListener(_onScroll);
+  }
+
+  Future<void> _recordVisit() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      final hotelId = hotel['id'];
+      if (hotelId == null) return;
+
+      // Get accurate current position for geo validation
+      final Position pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+
+      // Dist coordinates
+      final double hotelLat = (hotel['latitude'] is String)
+          ? double.tryParse(hotel['latitude']) ?? 0.0
+          : (hotel['latitude'] as num?)?.toDouble() ?? 0.0;
+      final double hotelLng = (hotel['longitude'] is String)
+          ? double.tryParse(hotel['longitude']) ?? 0.0
+          : (hotel['longitude'] as num?)?.toDouble() ?? 0.0;
+
+      // Calculate distance
+      final double distance = Geolocator.distanceBetween(
+        pos.latitude,
+        pos.longitude,
+        hotelLat,
+        hotelLng,
+      );
+
+      debugPrint('DEBUG: Geofencing Check (Hotel): distance = $distance m');
+
+      // Only record if in radius
+      if (distance <= 500) {
+        // Record this visit to history
+        await Supabase.instance.client.from('riwayat_kunjungan').insert({
+          'user_id': user.id,
+          'hotel_id': hotelId,
+          'waktu_kunjungan': DateTime.now().toIso8601String(),
+        });
+
+        if (mounted) {
+          final String namaHotel = hotel['nama'] ?? hotel['name'] ?? 'Hotel';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Kunjungan Anda di $namaHotel telah dicatat! 📍'),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: AppColors.primary,
+            ),
+          );
+        }
+      } else {
+        // TOO FAR SnackBar
+        if (mounted) {
+          final String namaHotel = hotel['nama'] ?? hotel['name'] ?? 'Hotel';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Anda sedang tidak berada di $namaHotel, kunjungan tidak akan masuk riwayat. 📍'),
+              duration: const Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.orange.shade700,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('DEBUG: Error recording hotel visit (geofencing): $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal mencatat kunjungan hotel: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -95,18 +176,18 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
       return;
     }
 
-    final url = Uri.parse(
-      'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
-    );
+    final double validLat = (lat is String) ? double.tryParse(lat) ?? 0.0 : (lat as num).toDouble();
+    final double validLng = (lng is String) ? double.tryParse(lng) ?? 0.0 : (lng as num).toDouble();
 
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tidak dapat membuka aplikasi peta')),
-      );
-    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapPage(
+          initialLocation: LatLng(validLat, validLng),
+          initialName: hotel['nama'] ?? hotel['name'],
+        ),
+      ),
+    );
   }
 
   Future<void> _fetchFavoriteStatus() async {
@@ -307,7 +388,7 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
         opacity: _isAppBarCollapsed ? 1.0 : 0.0,
         duration: const Duration(milliseconds: 200),
         child: Text(
-          hotel['nama'] ?? hotel['name'] ?? '',
+          hotel['nama'] ?? '',
           style: const TextStyle(
             color: AppColors.textPrimary,
             fontSize: 18,
@@ -361,7 +442,6 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
                 final bintang = (hotel['bintang'] as num?)?.toInt() ?? 0;
                 final namaHotel =
                     hotel['nama']?.toString() ??
-                    hotel['name']?.toString() ??
                     'Hotel';
                 final slug = hotel['slug']?.toString() ?? '';
                 final shareText =
@@ -372,6 +452,7 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
                     'Lihat detail selengkapnya di sini:\n'
                     'https://delira.app/hotel/$slug\n\n'
                     'Ayo liburan ke Medan dan booking sekarang di aplikasi Delira!';
+                // ignore: deprecated_member_use
                 Share.share(shareText);
               },
             ),
@@ -399,21 +480,13 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
               itemBuilder: (context, index) {
                 final imageUrl = allImages[index];
 
-                return Image.network(
-                  imageUrl,
+                return CachedNetworkImage(
+                  imageUrl: imageUrl,
                   fit: BoxFit.cover,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Center(
-                      child: CircularProgressIndicator(
-                        value: loadingProgress.expectedTotalBytes != null
-                            ? loadingProgress.cumulativeBytesLoaded /
-                                  loadingProgress.expectedTotalBytes!
-                            : null,
-                      ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) {
+                  placeholder: (context, url) => const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                  errorWidget: (context, url, error) {
                     debugPrint(
                       'LOG: Image loading failed for URL: $imageUrl, Error: $error',
                     );
@@ -641,12 +714,16 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
                     _galeriList[index]['foto_url']?.toString() ?? '';
                 return ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    fotoUrl,
+                  child: CachedNetworkImage(
+                    imageUrl: fotoUrl,
                     width: 140,
                     height: 100,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stack) => Container(
+                    placeholder: (context, url) => Container(
+                      width: 140,
+                      color: Colors.grey.shade200,
+                    ),
+                    errorWidget: (context, url, error) => Container(
                       width: 140,
                       color: Colors.grey.shade300,
                       child: const Icon(Icons.broken_image, color: Colors.grey),
@@ -957,7 +1034,7 @@ class _HotelDetailPageState extends State<HotelDetailPage> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _ulasanList.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
             itemBuilder: (context, index) =>
                 _buildReviewCard(_ulasanList[index]),
           ),

@@ -1,18 +1,22 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:http/http.dart' as http;
 import 'package:delira/detail_page.dart';
 import 'package:delira/utils/location_utils.dart';
 import 'package:delira/models/destinasi.dart';
 import 'package:delira/theme/app_colors.dart';
 import 'package:flutter/services.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class MapPage extends StatefulWidget {
   final VoidCallback? onHotelRequested;
-  const MapPage({super.key, this.onHotelRequested});
+  final LatLng? initialLocation;
+  final String? initialName;
+  const MapPage({super.key, this.onHotelRequested, this.initialLocation, this.initialName});
 
   @override
   State<MapPage> createState() => _MapPageState();
@@ -26,6 +30,8 @@ class _MapPageState extends State<MapPage> {
   bool _isLoading = true;
   String _selectedCategory = 'Semua';
   Position? _userPosition;
+  List<LatLng> _routePoints = [];
+  bool _isRouting = false;
 
   @override
   void initState() {
@@ -39,12 +45,19 @@ class _MapPageState extends State<MapPage> {
     if (mounted) {
       setState(() {
         _userPosition = pos;
-        // Center map to user once
-        if (pos != null) {
-          _mapController.move(LatLng(pos.latitude, pos.longitude), 14);
-        }
         _buildMarkers(_allDestinasi, _allHotels);
       });
+      if (widget.initialLocation != null && pos != null) {
+        // Automatically route to the initial location
+        _openNavigation(
+          widget.initialLocation!.latitude,
+          widget.initialLocation!.longitude,
+          widget.initialName ?? 'Tujuan',
+        );
+      } else if (pos != null) {
+        // Center map to user once
+        _mapController.move(LatLng(pos.latitude, pos.longitude), 14);
+      }
     }
   }
 
@@ -201,24 +214,60 @@ class _MapPageState extends State<MapPage> {
   }
 
   Future<void> _openNavigation(double lat, double lng, String nama) async {
-    // Try Google Maps app first
-    final googleMapsUrl = Uri.parse(
-      'google.navigation:q=$lat,$lng&mode=d'
-    );
+    if (_userPosition == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lokasi kamu belum tersedia untuk navigasi')),
+      );
+      return;
+    }
 
-    // Fallback to browser Google Maps if app not installed
-    final googleMapsBrowser = Uri.parse(
-      'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&destination_place_name=${Uri.encodeComponent(nama)}&travelmode=driving'
-    );
-
-    if (await canLaunchUrl(googleMapsUrl)) {
-      await launchUrl(googleMapsUrl);
-    } else if (await canLaunchUrl(googleMapsBrowser)) {
-      await launchUrl(googleMapsBrowser, mode: LaunchMode.externalApplication);
-    } else {
+    setState(() => _isRouting = true);
+    
+    try {
+      final userLat = _userPosition!.latitude;
+      final userLng = _userPosition!.longitude;
+      
+      final String url = 'http://router.project-osrm.org/route/v1/driving/$userLng,$userLat;$lng,$lat?geometries=geojson';
+      final response = await http.get(Uri.parse(url));
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final List routes = data['routes'] ?? [];
+        if (routes.isNotEmpty) {
+          final geometry = routes[0]['geometry'];
+          final List coordinates = geometry['coordinates'];
+          
+          final List<LatLng> points = coordinates.map((coord) {
+            return LatLng(coord[1] as double, coord[0] as double); // GeoJSON format is [lng, lat]
+          }).toList();
+          
+          if (mounted) {
+            setState(() {
+              _routePoints = points;
+              _isRouting = false;
+            });
+            
+            final bounds = LatLngBounds.fromPoints(points);
+            _mapController.fitCamera(
+              CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50)),
+            );
+          }
+        } else {
+           if (mounted) {
+             setState(() => _isRouting = false);
+             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Rute tidak ditemukan')));
+           }
+        }
+      } else {
+        if (mounted) {
+          setState(() => _isRouting = false);
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gagal memuat rute')));
+        }
+      }
+    } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tidak dapat membuka navigasi')));
+        setState(() => _isRouting = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -260,12 +309,17 @@ class _MapPageState extends State<MapPage> {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      dest.fullImageUrl,
+                    child: CachedNetworkImage(
+                      imageUrl: dest.fullImageUrl,
                       width: 80,
                       height: 80,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stack) => Container(
+                      placeholder: (context, url) => Container(
+                        width: 80,
+                        height: 80,
+                        color: Colors.grey[200],
+                      ),
+                      errorWidget: (context, url, error) => Container(
                         width: 80,
                         height: 80,
                         color: const Color(0xFFE8F5EE),
@@ -415,12 +469,17 @@ class _MapPageState extends State<MapPage> {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      h['image_url'] ?? '',
+                    child: CachedNetworkImage(
+                      imageUrl: h['image_url'] ?? '',
                       width: 80,
                       height: 80,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stack) => Container(
+                      placeholder: (context, url) => Container(
+                        width: 80,
+                        height: 80,
+                        color: Colors.grey[200],
+                      ),
+                      errorWidget: (context, url, error) => Container(
                         width: 80,
                         height: 80,
                         color: const Color(0xFFE8F5EE),
@@ -434,7 +493,7 @@ class _MapPageState extends State<MapPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          h['nama'] ?? h['name'] ?? '',
+                          h['nama'] ?? '',
                           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
@@ -513,7 +572,7 @@ class _MapPageState extends State<MapPage> {
                           _openNavigation(
                             (h['latitude'] as num?)?.toDouble() ?? 0.0,
                             (h['longitude'] as num?)?.toDouble() ?? 0.0,
-                            h['nama'] ?? h['name'] ?? '',
+                            h['nama'] ?? '',
                           );
                         },
                         icon: const Icon(Icons.explore, size: 16, color: Colors.white),
@@ -566,8 +625,8 @@ class _MapPageState extends State<MapPage> {
             FlutterMap(
               mapController: _mapController,
               options: MapOptions(
-                initialCenter: const LatLng(3.5952, 98.6722),
-                initialZoom: 13,
+                initialCenter: widget.initialLocation ?? const LatLng(3.5952, 98.6722),
+                initialZoom: widget.initialLocation != null ? 15 : 13,
                 interactionOptions: const InteractionOptions(
                   flags: InteractiveFlag.all,
                 ),
@@ -577,11 +636,21 @@ class _MapPageState extends State<MapPage> {
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.delira.app',
                 ),
+                if (_routePoints.isNotEmpty)
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(
+                        points: _routePoints,
+                        strokeWidth: 4.0,
+                        color: Colors.blueAccent,
+                      ),
+                    ],
+                  ),
                 MarkerLayer(markers: _markers),
               ],
             ),
             
-            if (_isLoading)
+            if (_isLoading || _isRouting)
               const Center(
                 child: CircularProgressIndicator(color: Color(0xFF1A6B4A)),
               ),

@@ -6,9 +6,12 @@ import 'package:geolocator/geolocator.dart';
 import 'package:delira/utils/location_utils.dart';
 import 'package:delira/models/destinasi.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:delira/hotel_page.dart';
+import 'package:delira/map_page.dart';
+import 'package:delira/ai_guide_page.dart';
 
 class DetailPage extends StatefulWidget {
   final Destinasi destinasi;
@@ -23,13 +26,12 @@ class _DetailPageState extends State<DetailPage> {
   Destinasi get destinasi => widget.destinasi;
   Position? _currentPosition;
   List<String> _galleryImages = [];
-  final PageController _pageController = PageController();
   final ScrollController _scrollController = ScrollController();
+  final PageController _pageController = PageController();
   int _currentPage = 0;
   bool _isAppBarCollapsed = false;
   bool _isFavorited = false;
   bool _isLoadingGallery = false;
-  String? _galleryError;
   bool _isDescriptionExpanded = false;
   List<Map<String, dynamic>> _ulasanList = [];
   bool _isLoadingUlasan = true;
@@ -54,15 +56,74 @@ class _DetailPageState extends State<DetailPage> {
       final user = Supabase.instance.client.auth.currentUser;
       if (user == null || destinasi.id == null) return;
 
-      // Record this visit to history
-      await Supabase.instance.client.from('riwayat_kunjungan').insert({
-        'user_id': user.id,
-        'destinasi_id': destinasi.id!,
-        'nama_destinasi': destinasi.nama,
-        'waktu_kunjungan': DateTime.now().toIso8601String(),
-      });
+      // Get accurate current position for validation
+      final Position pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+
+      // Dist destinasi coordinates
+      final double destLat = destinasi.latitude;
+      final double destLng = destinasi.longitude;
+
+      // Calculate distance in meters
+      final double distance = Geolocator.distanceBetween(
+        pos.latitude,
+        pos.longitude,
+        destLat,
+        destLng,
+      );
+
+      debugPrint(
+        'DEBUG: Geofencing Check: distance = $distance meters (Threshold: 500m)',
+      );
+
+      // ONLY RECORD if within 500m radius
+      if (distance <= 500) {
+        await Supabase.instance.client.from('riwayat_kunjungan').insert({
+          'user_id': user.id,
+          'destinasi_id': destinasi.id!,
+          'waktu_kunjungan': DateTime.now().toIso8601String(),
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Kunjungan Anda di ${destinasi.nama} telah dicatat!',
+              ),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: AppColors.primary,
+            ),
+          );
+        }
+      } else {
+        // TOO FAR SnackBar
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Anda sedang tidak di ${destinasi.nama}, kunjungan tidak akan masuk riwayat.',
+              ),
+              duration: const Duration(seconds: 3),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.orange.shade700,
+            ),
+          );
+        }
+      }
     } catch (e) {
-      debugPrint('DEBUG: Error recording visit: $e');
+      debugPrint('DEBUG: Error recording visit (geofencing): $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal mencatat kunjungan: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     }
   }
 
@@ -87,7 +148,6 @@ class _DetailPageState extends State<DetailPage> {
     if (mounted) {
       setState(() {
         _isLoadingGallery = true;
-        _galleryError = null;
       });
     }
 
@@ -95,28 +155,22 @@ class _DetailPageState extends State<DetailPage> {
       final res = await Supabase.instance.client
           .from('destinasi_galeri')
           .select('*')
-          .eq('destinasi_id', destinasi.id ?? '');
+          .eq('destinasi_id', destinasi.id ?? '')
+          .order('urutan', ascending: true); // Sesuai schema: urutan integer
 
       if (mounted) {
         setState(() {
           _galleryImages = (res as List)
               .map((e) => e['foto_url']?.toString() ?? '')
+              .where((url) => url.isNotEmpty)
               .toList();
           _isLoadingGallery = false;
-
-          if (_galleryImages.isEmpty) {
-            debugPrint('LOG: Gallery is empty for ID: ${destinasi.id}');
-            debugPrint(
-              'LOG: Main fotoUtamaUrl fallback = ${destinasi.fotoUtamaUrl}',
-            );
-          }
         });
       }
     } catch (e) {
       debugPrint('DB_ERROR: $e');
       if (mounted) {
         setState(() {
-          _galleryError = e.toString();
           _isLoadingGallery = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
@@ -129,13 +183,34 @@ class _DetailPageState extends State<DetailPage> {
   Future<void> _fetchLocation() async {
     final pos = await LocationUtils.getCurrentPosition();
     if (mounted) {
-      debugPrint(
-        'LOG: Destinasi Deskripsi Length: ${destinasi.deskripsi.length}',
-      );
       setState(() {
         _currentPosition = pos;
       });
     }
+  }
+
+  /// Menggabungkan foto utama (dari destinasi) dan foto-foto dari galeri.
+  List<String> _getAllImages() {
+    final List<String> allImages = [];
+    const baseUrl =
+        'https://pdhvqcbnsncxkfspasjq.supabase.co/storage/v1/object/public/destinasi/';
+
+    // 1. Tambahkan foto utama sebagai gambar pertama di slider
+    if (destinasi.fotoUtamaUrl != null && destinasi.fotoUtamaUrl!.isNotEmpty) {
+      final mainImg = destinasi.fotoUtamaUrl!;
+      allImages.add(mainImg.startsWith('http') ? mainImg : '$baseUrl$mainImg');
+    }
+
+    // 2. Tambahkan foto-foto dari tabel destinasi_galeri
+    for (var img in _galleryImages) {
+      final imageUrl = img.startsWith('http') ? img : '$baseUrl$img';
+      // Hindari duplikasi jika foto utama ada di galeri juga
+      if (!allImages.contains(imageUrl)) {
+        allImages.add(imageUrl);
+      }
+    }
+
+    return allImages;
   }
 
   Future<void> _fetchFavoriteStatus() async {
@@ -237,6 +312,7 @@ class _DetailPageState extends State<DetailPage> {
         '💸 Tiket: $harga\n\n'
         'Ayo liburan ke Medan dan jelajahi tempat-tempat seru lainnya di aplikasi Delira!';
 
+    // ignore: deprecated_member_use
     Share.share(shareText);
   }
 
@@ -301,38 +377,8 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   Widget _buildSliverAppBar(BuildContext context) {
-    // PREPEND BASE URL MANUALLY FOR DEBUGGING
-    const baseUrl =
-        'https://pdhvqcbnsncxkfspasjq.supabase.co/storage/v1/object/public/destinasi/';
-
-    final List<String> allImages = [];
-
-    // Add gallery images first
-    for (var img in _galleryImages) {
-      if (img.isNotEmpty) {
-        if (img.startsWith('http')) {
-          allImages.add(img);
-        } else {
-          allImages.add('$baseUrl$img');
-        }
-      }
-    }
-
-    // Fallback to main image if gallery is empty
-    if (allImages.isEmpty) {
-      if (destinasi.fotoUtamaUrl != null &&
-          destinasi.fotoUtamaUrl!.isNotEmpty) {
-        final mainImg = destinasi.fotoUtamaUrl!;
-        if (mainImg.startsWith('http')) {
-          allImages.add(mainImg);
-        } else {
-          allImages.add('$baseUrl$mainImg');
-        }
-      }
-    }
-
-    debugPrint('DEBUG_URL: ${destinasi.fotoUtamaUrl}');
-    debugPrint('DEBUG: Final allImages List = $allImages');
+    final List<String> allImages = _getAllImages();
+    debugPrint('DEBUG: Header sliders with ${allImages.length} images');
 
     return SliverAppBar(
       pinned: true,
@@ -418,74 +464,13 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   Widget _buildHeaderContent() {
-    // PREPEND BASE URL MANUALLY FOR DEBUGGING
-    const baseUrl =
-        'https://pdhvqcbnsncxkfspasjq.supabase.co/storage/v1/object/public/destinasi/';
+    final List<String> allImages = _getAllImages();
 
-    final List<String> allImages = [];
-
-    // Add gallery images first
-    for (var img in _galleryImages) {
-      if (img.isNotEmpty) {
-        if (img.startsWith('http')) {
-          allImages.add(img);
-        } else {
-          allImages.add('$baseUrl$img');
-        }
-      }
-    }
-
-    // Fallback to main image if gallery is empty
     if (allImages.isEmpty) {
-      if (destinasi.fotoUtamaUrl != null &&
-          destinasi.fotoUtamaUrl!.isNotEmpty) {
-        final mainImg = destinasi.fotoUtamaUrl!;
-        if (mainImg.startsWith('http')) {
-          allImages.add(mainImg);
-        } else {
-          allImages.add('$baseUrl$mainImg');
-        }
-      }
-    }
-
-    if (_isLoadingGallery) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_galleryError != null || (allImages.isEmpty)) {
-      final bool mainImgMissing =
-          destinasi.fotoUtamaUrl == null || destinasi.fotoUtamaUrl!.isEmpty;
-      final errorMsg =
-          _galleryError ??
-          (mainImgMissing ? 'Foto Utama juga tidak valid' : 'Galeri Kosong');
       return Container(
         color: Colors.grey[200],
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 64, color: Colors.red),
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
-                'ERROR: $errorMsg',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.red,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _fetchGallery,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Coba Lagi'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-              ),
-            ),
-          ],
+        child: const Center(
+          child: Icon(Icons.broken_image, size: 48, color: Colors.grey),
         ),
       );
     }
@@ -503,48 +488,27 @@ class _DetailPageState extends State<DetailPage> {
           itemBuilder: (context, index) {
             final imageUrl = allImages[index];
 
-            return Image.network(
-              imageUrl,
+            return CachedNetworkImage(
+              imageUrl: imageUrl,
               fit: BoxFit.cover,
               filterQuality: FilterQuality.high,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return Center(
-                  child: CircularProgressIndicator(
-                    value: loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded /
-                              loadingProgress.expectedTotalBytes!
-                        : null,
-                  ),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) {
-                debugPrint(
-                  'LOG: Render Error for URL: $imageUrl, Error: $error',
-                );
+              placeholder: (context, url) => const Center(
+                child: CircularProgressIndicator(),
+              ),
+              errorWidget: (context, url, error) {
                 return Container(
                   color: Colors.grey[200],
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.broken_image,
-                        size: 48,
-                        color: Colors.grey,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Render Error: $error',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.red, fontSize: 10),
-                      ),
-                    ],
+                  child: const Icon(
+                    Icons.broken_image,
+                    size: 48,
+                    color: Colors.grey,
                   ),
                 );
               },
             );
           },
         ),
+        // Indikator Titik (Dots)
         if (allImages.length > 1)
           Positioned(
             bottom: 20,
@@ -643,7 +607,12 @@ class _DetailPageState extends State<DetailPage> {
           'Jarak',
           Colors.green,
         ),
-        _buildStatBox(Icons.history, '1906', 'Tahun', Colors.grey),
+        _buildStatBox(
+          Icons.history,
+          destinasi.tahun ?? '-',
+          'Tahun',
+          Colors.grey,
+        ),
       ],
     );
   }
@@ -854,13 +823,8 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   Widget _buildGallerySection() {
-    final List<String> allImages = _galleryImages.isNotEmpty
-        ? _galleryImages.map((img) {
-            if (img.startsWith('http')) return img;
-            const baseUrl = 'https://pdhvqcbnsncxkfspasjq.supabase.co';
-            return '$baseUrl/storage/v1/object/public/destinasi/$img';
-          }).toList()
-        : [destinasi.fullImageUrl];
+    const baseUrl =
+        'https://pdhvqcbnsncxkfspasjq.supabase.co/storage/v1/object/public/destinasi/';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -870,26 +834,45 @@ class _DetailPageState extends State<DetailPage> {
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 16),
-        SizedBox(
-          height: 100,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: allImages.length,
-            separatorBuilder: (context, index) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              return Container(
-                width: 100,
-                decoration: BoxDecoration(
+        if (_isLoadingGallery)
+          const Center(child: CircularProgressIndicator())
+        else if (_galleryImages.isEmpty)
+          const Text(
+            'Tidak ada foto galeri.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          )
+        else
+          SizedBox(
+            height: 100,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _galleryImages.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final img = _galleryImages[index];
+                final imageUrl = img.startsWith('http') ? img : '$baseUrl$img';
+
+                return ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  image: DecorationImage(
-                    image: NetworkImage(allImages[index]),
+                  child: CachedNetworkImage(
+                    imageUrl: imageUrl,
+                    width: 140, // Mengikuti desain hotel_detail_page
+                    height: 100,
                     fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      width: 140,
+                      color: Colors.grey.shade200,
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      width: 140,
+                      color: Colors.grey.shade300,
+                      child: const Icon(Icons.broken_image, color: Colors.grey),
+                    ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
-        ),
       ],
     );
   }
@@ -925,18 +908,15 @@ class _DetailPageState extends State<DetailPage> {
   }
 
   Future<void> _launchNavigation() async {
-    final url = Uri.parse(
-      'https://www.google.com/maps/search/?api=1&query=${destinasi.latitude},${destinasi.longitude}',
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MapPage(
+          initialLocation: LatLng(destinasi.latitude, destinasi.longitude),
+          initialName: destinasi.nama,
+        ),
+      ),
     );
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tidak dapat membuka peta')),
-        );
-      }
-    }
   }
 
   Widget _buildLocationSection() {
@@ -1074,7 +1054,7 @@ class _DetailPageState extends State<DetailPage> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _ulasanList.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            separatorBuilder: (_, _) => const SizedBox(height: 12),
             itemBuilder: (context, index) =>
                 _buildReviewCard(_ulasanList[index]),
           ),
@@ -1323,7 +1303,14 @@ class _DetailPageState extends State<DetailPage> {
                     child: SizedBox(
                       height: 52,
                       child: OutlinedButton.icon(
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const AIGuidePage(),
+                            ),
+                          );
+                        },
                         icon: const Icon(
                           Icons.smart_toy_outlined,
                           size: 16,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:delira/theme/app_colors.dart';
 import 'package:delira/checkout_page.dart';
 
@@ -150,26 +151,36 @@ class _RoomSelectionPageState extends State<RoomSelectionPage> {
           child: Container(color: AppColors.border, height: 1),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          children: [
-            // ---- Summary Card ----
-            _buildSummaryCard(),
-            const SizedBox(height: 28),
-            // ---- Room Cards ----
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _rooms.length,
-              separatorBuilder: (context, index) =>
-                  const SizedBox(height: 20),
-              itemBuilder: (context, index) =>
-                  _buildRoomCard(_rooms[index]),
+      body: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.all(20.0),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                // ---- Summary Card ----
+                _buildSummaryCard(),
+                const SizedBox(height: 28),
+              ]),
             ),
-            SizedBox(height: MediaQuery.of(context).padding.bottom + 40),
-          ],
-        ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: _buildRoomCard(_rooms[index]),
+                  );
+                },
+                childCount: _rooms.length,
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: SizedBox(height: MediaQuery.of(context).padding.bottom + 40),
+          ),
+        ],
       ),
     );
   }
@@ -327,12 +338,19 @@ class _RoomSelectionPageState extends State<RoomSelectionPage> {
               borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(19)),
               child: fotoUrl.isNotEmpty
-                  ? Image.network(
-                      fotoUrl,
+                  ? CachedNetworkImage(
+                      imageUrl: fotoUrl,
                       height: 120,
                       width: double.infinity,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Container(
+                      placeholder: (context, url) => Container(
+                        height: 120,
+                        color: AppColors.surface,
+                        child: const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
+                      errorWidget: (_, _, _) => Container(
                         height: 120,
                         color: AppColors.surface,
                         child: const Center(
@@ -439,8 +457,8 @@ class _RoomSelectionPageState extends State<RoomSelectionPage> {
                           context,
                           MaterialPageRoute(
                             builder: (context) => CheckoutPage(
-                              hotelName: widget.hotel['nama'] ?? widget.hotel['name'] ?? 'Hotel',
-                              roomType: room['tipe_kamar'] ?? room['name'] ?? 'Kamar',
+                              hotelName: widget.hotel['nama'] ?? 'Hotel',
+                              roomType: room['tipe_kamar'] ?? 'Kamar',
                               roomPrice: rawPrice,
                               checkIn: _checkIn,
                               checkOut: _checkOut,

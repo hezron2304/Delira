@@ -85,6 +85,7 @@ class _ETicketPageState extends State<ETicketPage> {
         ).create();
         await imagePath.writeAsBytes(image);
 
+        // ignore: deprecated_member_use
         await Share.shareXFiles([
           XFile(imagePath.path),
         ], text: 'Cek E-Tiket saya untuk pemesanan di ${widget.hotelName}!');

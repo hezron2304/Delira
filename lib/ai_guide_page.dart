@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class DetectedObject {
@@ -55,9 +56,10 @@ class _AIGuidePageState extends State<AIGuidePage>
   bool _cameraReady = false;
 
   // ── AR Gemini Vision ────────────────────────────────────────────────────────
-  Timer? _arTimer;
   List<DetectedObject> _arObjects = [];
   bool _isARDetecting = false;
+  bool _isAiSpeaking = false; // Track if AI is talking
+  bool _isWaitingForUser = false; // Show "Scan Again" button
   late FlutterTts _flutterTts;
 
   // ── Scan / Gemini Vision ────────────────────────────────────────────────────
@@ -207,112 +209,145 @@ class _AIGuidePageState extends State<AIGuidePage>
     await _flutterTts.setLanguage("id-ID");
     await _flutterTts.setPitch(1.0);
     await _flutterTts.setSpeechRate(0.5);
+
+    // Track speech completion
+    _flutterTts.setCompletionHandler(() {
+      if (mounted) {
+        setState(() {
+          _isAiSpeaking = false;
+          _isWaitingForUser = true;
+        });
+      }
+    });
+
+    _flutterTts.setErrorHandler((msg) {
+      if (mounted) {
+        setState(() {
+          _isAiSpeaking = false;
+          _isWaitingForUser = true;
+        });
+      }
+    });
   }
 
   Future<void> _speak(String text) async {
     if (text.isEmpty) return;
     await _flutterTts.stop();
+    setState(() {
+      _isAiSpeaking = true;
+      _isWaitingForUser = false;
+    });
     await _flutterTts.speak(text);
   }
 
-  void _startARDetection() {
-    _arTimer?.cancel();
-    debugPrint('DEBUG: Memulai Timer Deteksi AR (Delay 2s)');
+  Future<void> _performARScan() async {
+    if (!_isARMode || !_cameraReady || _cameraController == null) return;
+    if (_isARDetecting || !_cameraController!.value.isInitialized) return;
 
-    // Beri waktu kamera benar-benar siap sebelum deteksi pertama
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted || !_isARMode) return;
+    debugPrint('DEBUG: Memulai Deteksi AR Tunggal...');
+    setState(() {
+      _isARDetecting = true;
+      _isWaitingForUser = false;
+    });
 
-      _arTimer = Timer.periodic(const Duration(seconds: 15), (_) async {
-        if (!_isARMode || !_cameraReady || _cameraController == null) return;
-        if (_isARDetecting || !_cameraController!.value.isInitialized) return;
+    try {
+      final XFile file = await _cameraController!.takePicture();
+      final bytes = await File(file.path).readAsBytes();
 
-        _isARDetecting = true;
-        if (mounted) setState(() {});
+      if (_isCooldown) {
+        debugPrint('DEBUG: AI sedang Cooldown, skip deteksi AR.');
+        return;
+      }
 
+      final content = [
+        Content.multi([
+          DataPart('image/jpeg', bytes),
+          TextPart(
+            'Identifikasi objek utama (bangunan, fasilitas, atau benda unik). '
+            'Respon HANYA format JSON list: [{"name": "..", "description": "..", "x": 1-100, "y": 1-100}]. '
+            'PENTING: Gunakan bahasa yang sesuai konteks (ID/EN). '
+            'Persona: Delira (santai & bersahabat). Tanpa emoji. Maks 2 objek.',
+          ),
+        ]),
+      ];
+
+      final response = await _visionModel.generateContent(content);
+      final jsonText = response.text;
+
+      debugPrint('DEBUG: Terdeteksi: $jsonText');
+      if (jsonText != null && jsonText.isNotEmpty && mounted) {
         try {
-          debugPrint('DEBUG: Menangkap foto AR...');
-          final XFile file = await _cameraController!.takePicture();
-          final bytes = await File(file.path).readAsBytes();
+          String jsonStr = jsonText.trim();
+          final RegExp jsonRegex = RegExp(r'\[.*\]', dotAll: true);
+          final match = jsonRegex.stringMatch(jsonStr);
+          if (match == null) throw Exception('Invalid JSON format');
 
-          debugPrint('DEBUG: Mengirim ke Gemini Vision via Package...');
-          if (_isCooldown) {
-            debugPrint('DEBUG: AI sedang Cooldown, skip deteksi AR.');
-            return;
-          }
+          final List<dynamic> list = json.decode(match);
+          final List<DetectedObject> newObjects =
+              list.map((item) => DetectedObject.fromJson(item)).toList();
 
-          final content = [
-            Content.multi([
-              DataPart('image/jpeg', bytes),
-              TextPart(
-                'Identifikasi objek utama (bangunan, fasilitas, atau benda unik). '
-                'Respon HANYA format JSON list: [{"name": "..", "description": "..", "x": 1-100, "y": 1-100}]. '
-                'PENTING: Gunakan bahasa yang sama dengan input atau bahasa yang paling sesuai untuk turis (ID/EN). '
-                'Persona: Delira (santai & bersahabat). Tanpa emoji. Maks 2 objek.',
-              ),
-            ]),
-          ];
+          setState(() => _arObjects = newObjects);
 
-          final response = await _visionModel.generateContent(content);
-          final jsonText = response.text;
-
-          debugPrint('DEBUG: Terdeteksi: $jsonText');
-          if (jsonText != null && jsonText.isNotEmpty && mounted) {
+          if (newObjects.isNotEmpty) {
+            // Concatenate all objects info so AI speaks everything automatically
+            final fullNarration = newObjects.map((obj) => "${obj.name}. ${obj.description}").join(" ");
+            
+            // Wait a tiny bit for the camera UI to settle before speaking
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (mounted) _speak(fullNarration);
+            });
+            
+            // Upload image to Supabase Storage
+            String? imageUrl;
             try {
-              // More robust JSON cleaning
-              String jsonStr = jsonText.trim();
-              final RegExp jsonRegex = RegExp(r'\[.*\]', dotAll: true);
-              final match = jsonRegex.stringMatch(jsonStr);
-              if (match == null) throw Exception('Invalid JSON format');
-
-              final List<dynamic> list = json.decode(match);
-              final List<DetectedObject> newObjects = list
-                  .map((item) => DetectedObject.fromJson(item))
-                  .toList();
-
-              setState(() => _arObjects = newObjects);
-
-              // Auto-read the first object if it's new
-              if (newObjects.isNotEmpty) {
-                final first = newObjects.first;
-                _speak("${first.name}. ${first.description}");
-              }
+              imageUrl = await _uploadScanImage(file.path);
             } catch (e) {
-              debugPrint('DEBUG: Error parsing AR JSON: $e');
+              debugPrint('DEBUG: Error uploading AR image: $e');
             }
+
+            // Record the most important scan (the first one) to history
+            final first = newObjects.first;
+            _recordScan(
+              first.name.length > 50
+                  ? '${first.name.substring(0, 47)}...'
+                  : first.name,
+              first.description,
+              imageUrl,
+            );
+          } else {
+            // No objects found, let user try again immediately
+            setState(() => _isWaitingForUser = true);
           }
         } catch (e) {
-          debugPrint('DEBUG: Error Deteksi AR: $e');
-          if (e.toString().contains('429') || e.toString().contains('quota')) {
-            _triggerCooldown();
-          } else {
-            // Show error to user via SnackBar occasionally so they aren't confused
-            if (mounted && _isARMode) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Delira (AR Error): $e'),
-                  duration: const Duration(seconds: 3),
-                ),
-              );
-            }
-          }
-        } finally {
-          _isARDetecting = false;
-          if (mounted) setState(() {});
+          debugPrint('DEBUG: Error parsing AR JSON: $e');
+          setState(() => _isWaitingForUser = true);
         }
-      });
-    });
+      } else {
+        setState(() => _isWaitingForUser = true);
+      }
+    } catch (e) {
+      debugPrint('DEBUG: Error Deteksi AR: $e');
+      if (e.toString().contains('429') || e.toString().contains('quota')) {
+        _triggerCooldown();
+      } else {
+        setState(() => _isWaitingForUser = true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isARDetecting = false);
+      }
+    }
   }
 
   void _stopARDetection() {
-    _arTimer?.cancel();
-    _arTimer = null;
+    // Just a stub now as there is no timer
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_cameraController == null || !_cameraController!.value.isInitialized)
+    if (_cameraController == null || !_cameraController!.value.isInitialized) {
       return;
+    }
     if (state == AppLifecycleState.inactive) {
       _cameraController?.dispose();
     } else if (state == AppLifecycleState.resumed) {
@@ -335,7 +370,7 @@ class _AIGuidePageState extends State<AIGuidePage>
         _cameraController = controller;
         _cameraReady = true;
       });
-      if (_isARMode) _startARDetection();
+      if (_isARMode) _performARScan();
     } catch (_) {
       setState(() => _cameraReady = false);
     }
@@ -430,14 +465,26 @@ class _AIGuidePageState extends State<AIGuidePage>
           _isScanLoading = false;
         });
 
+        // Speak the result automatically
+        _speak(result);
+
+        // Upload image to Supabase Storage
+        String? imageUrl;
+        if (_capturedImagePath != null) {
+          try {
+            imageUrl = await _uploadScanImage(_capturedImagePath!);
+          } catch (e) {
+            debugPrint('DEBUG: Error uploading Scan image: $e');
+          }
+        }
+
         // Record manual scan to history
-        final scanName = result
-            .split('\n')
-            .first
-            .replaceAll(RegExp(r'[*#_]'), '')
-            .trim();
+        final scanName =
+            result.split('\n').first.replaceAll(RegExp(r'[*#_]'), '').trim();
         _recordScan(
           scanName.length > 50 ? '${scanName.substring(0, 47)}...' : scanName,
+          result,
+          imageUrl,
         );
       } else {
         throw Exception('No analysis result');
@@ -486,6 +533,7 @@ class _AIGuidePageState extends State<AIGuidePage>
   }
 
   void _resetScan() {
+    _flutterTts.stop(); // Stop speaking when closing result
     setState(() {
       _capturedImagePath = null;
       _scanResult = null;
@@ -524,13 +572,15 @@ class _AIGuidePageState extends State<AIGuidePage>
       final result = await InternetAddress.lookup(
         'google.com',
       ).timeout(const Duration(seconds: 3));
-      if (result.isEmpty || result[0].rawAddress.isEmpty)
+      if (result.isEmpty || result[0].rawAddress.isEmpty) {
         isLikelyOffline = true;
+      }
     } catch (_) {
       isLikelyOffline = true;
     }
 
     if (isLikelyOffline) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Koneksi internet tidak stabil. Coba lagi.'),
@@ -716,18 +766,58 @@ class _AIGuidePageState extends State<AIGuidePage>
     } catch (_) {}
   }
 
-  Future<void> _recordScan(String objectName) async {
+  Future<String?> _uploadScanImage(String localPath) async {
+    try {
+      debugPrint('DEBUG: Attempting to upload image from: $localPath');
+      final file = File(localPath);
+      if (!file.existsSync()) {
+        debugPrint('DEBUG: local file does not exist at $localPath');
+        return null;
+      }
+
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final path = 'scans/$fileName';
+
+      await Supabase.instance.client.storage
+          .from('gambar_riwayat')
+          .upload(path, file);
+
+      final String publicUrl = Supabase.instance.client.storage
+          .from('gambar_riwayat')
+          .getPublicUrl(path);
+
+      debugPrint('DEBUG: Upload success! URL: $publicUrl');
+      return publicUrl;
+    } catch (e) {
+      debugPrint('DEBUG: Upload to Supabase Storage FAILED: $e');
+      return null;
+    }
+  }
+
+  Future<void> _recordScan(String objectName, String description, String? imageUrl) async {
+    final cleanName = objectName.trim();
+    if (cleanName.isEmpty) return;
+
     try {
       final user = Supabase.instance.client.auth.currentUser;
-      if (user == null) return;
+      if (user == null) {
+        debugPrint('DEBUG: Skip _recordScan because user is not logged in.');
+        return;
+      }
 
+      debugPrint('DEBUG: Inserting record - Name: $cleanName, Desc Length: ${description.length}, Image: ${imageUrl != null ? 'Yes' : 'No'}');
+      
       await Supabase.instance.client.from('riwayat_scan').insert({
         'user_id': user.id,
-        'nama_objek': objectName,
+        'nama_objek': cleanName,
+        'deskripsi_hasil': description,
+        'foto_scan_url': imageUrl,
         'waktu_scan': DateTime.now().toIso8601String(),
       });
+      debugPrint('DEBUG: Success recording scan for object: $cleanName');
     } catch (e) {
-      debugPrint('DEBUG: Error recording scan: $e');
+      debugPrint('DEBUG: Error recording scan ($cleanName). Detailed error: $e');
+      // No snackbar here as it could be called frequently in AR mode
     }
   }
 
@@ -735,28 +825,36 @@ class _AIGuidePageState extends State<AIGuidePage>
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (bool didPop, dynamic result) {
-        if (didPop) return;
-        if (widget.onBackPressed != null) {
-          widget.onBackPressed!();
-        } else {
-          Navigator.of(context).pop();
-        }
-      },
-      child: Scaffold(
-        resizeToAvoidBottomInset: true,
-        backgroundColor: Colors.white,
-        body: SafeArea(
-          bottom: true, // TASK 1: Ensure bottom safety at the root
-          child: Column(
-            children: [
-              _buildTabBar(),
-              Expanded(
-                child: _selectedTab == 0 ? _buildCameraTab() : _buildChatPage(),
-              ),
-            ],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (bool didPop, dynamic result) {
+          if (didPop) return;
+          if (widget.onBackPressed != null) {
+            widget.onBackPressed!();
+          } else {
+            Navigator.of(context).pop();
+          }
+        },
+        child: Scaffold(
+          resizeToAvoidBottomInset: true,
+          backgroundColor: Colors.white,
+          body: SafeArea(
+            bottom: false, // Konsisten Edge-to-Edge: Konten mentok sampai bawah
+            child: Column(
+              children: [
+                _buildTabBar(),
+                Expanded(
+                  child: _selectedTab == 0 ? _buildCameraTab() : _buildChatPage(),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -766,18 +864,15 @@ class _AIGuidePageState extends State<AIGuidePage>
   // ── Tab Bar (2 tab) ───────────────────────────────────────────────────────────
 
   Widget _buildTabBar() {
-    return SafeArea(
-      top: true, // TASK 4: Protect tabs from status bar overlap
-      child: Container(
-        color: Colors.white,
-        child: Row(
-          children: [
-            Expanded(
-              child: _tabItem(Icons.camera_alt_outlined, 'Scan / AR', 0),
-            ),
-            Expanded(child: _tabItem(Icons.chat_bubble_outline, 'Chat AI', 1)),
-          ],
-        ),
+    return Container(
+      color: Colors.white,
+      child: Row(
+        children: [
+          Expanded(
+            child: _tabItem(Icons.camera_alt_outlined, 'Scan / AR', 0),
+          ),
+          Expanded(child: _tabItem(Icons.chat_bubble_outline, 'Chat AI', 1)),
+        ],
       ),
     );
   }
@@ -851,21 +946,20 @@ class _AIGuidePageState extends State<AIGuidePage>
             final screenWidth = MediaQuery.of(context).size.width;
             final screenHeight = MediaQuery.of(context).size.height;
             final xPos = (obj.x / 100) * screenWidth;
-            // Limit yPos to top 60% of the screen to avoid overlapping buttons and crowding
             final yPosRaw = (obj.y / 100) * screenHeight;
             final yPos = yPosRaw > screenHeight * 0.60
                 ? screenHeight * 0.60
                 : yPosRaw;
 
             return Positioned(
-              left: xPos - 80, // Offset to roughly center the marker
+              left: xPos - 80,
               top: yPos - 60,
               child: SizedBox(
-                width: 160, // Increased width for better text wrapping
+                width: 160,
                 child: GestureDetector(
                   onTap: () {
                     _speak("${obj.name}. ${obj.description}");
-                    _recordScan(obj.name);
+                    _recordScan(obj.name, obj.description, null);
                   },
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -922,7 +1016,10 @@ class _AIGuidePageState extends State<AIGuidePage>
                 ),
               ),
             );
-          }).toList(),
+          }),
+
+          // High-Tech Scanning Animation
+          if (_isARDetecting) _buildScanningLaser(),
 
           // Mode badge top left
           Positioned(
@@ -930,9 +1027,6 @@ class _AIGuidePageState extends State<AIGuidePage>
             left: 16,
             child: _hudBadge(Icons.view_in_ar, 'AR MODE', Colors.greenAccent),
           ),
-
-          // High-Tech Scanning Animation
-          if (_isARDetecting) _buildScanningLaser(),
         ],
 
         // ── Scan Mode overlay: QRIS-style ──
@@ -963,7 +1057,7 @@ class _AIGuidePageState extends State<AIGuidePage>
       decoration: BoxDecoration(
         color: Colors.black.withAlpha(140),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withAlpha(100)),
+        // REMOVED border to match the clean look requested
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1006,9 +1100,8 @@ class _AIGuidePageState extends State<AIGuidePage>
         setState(() {
           _isARMode = label == 'AR Mode';
           if (_isARMode) {
-            _startARDetection();
+            _performARScan();
           } else {
-            _stopARDetection();
             _arObjects = [];
           }
         });
@@ -1062,20 +1155,65 @@ class _AIGuidePageState extends State<AIGuidePage>
   }
 
   Widget _buildBottomControls() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.bottomCenter,
-          end: Alignment.topCenter,
-          colors: [Colors.black.withAlpha(200), Colors.transparent],
-        ),
-      ),
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        margin: const EdgeInsets.fromLTRB(28, 0, 28, 20), // Reduced "floating" gap from 60 to 20
+        // REMOVED: BoxDecoration with background, radius and shadow to make it borderless/transparent as requested
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           // ── Mode Toggle (AR / Scan) — bottom ──
           _buildModeToggle(),
+
+          // ── AR Interaction Button (Moved from Center) ──
+          if (_isWaitingForUser && !_isARDetecting && !_isAiSpeaking && _isARMode)
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Column(
+                children: [
+                  GestureDetector(
+                    onTap: _performARScan,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withAlpha(80),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.radar, color: Colors.white, size: 18),
+                          SizedBox(width: 10),
+                          Text(
+                            'Pindai Sekeliling Lagi',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Geser kamera lalu klik pindai',
+                    style: TextStyle(color: Colors.white60, fontSize: 10),
+                  ),
+                ],
+              ),
+            ),
 
           if (_isARDetecting && _isARMode)
             Padding(
@@ -1107,9 +1245,9 @@ class _AIGuidePageState extends State<AIGuidePage>
                       vertical: 10,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withAlpha(30),
+                      color: AppColors.primary.withAlpha(80), // Switched to primary green for color harmony
                       borderRadius: BorderRadius.circular(30),
-                      border: Border.all(color: Colors.white38),
+                      // REMOVED: border: Border.all(color: Colors.white38),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
@@ -1138,21 +1276,20 @@ class _AIGuidePageState extends State<AIGuidePage>
                     height: 72,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white,
-                      border: Border.all(color: AppColors.primary, width: 4),
+                      color: AppColors.primary.withAlpha(40), // Subtle green outer ring
                     ),
                     child: Center(
                       child: Container(
-                        width: 52,
-                        height: 52,
+                        width: 56,
+                        height: 56,
                         decoration: const BoxDecoration(
                           shape: BoxShape.circle,
-                          color: AppColors.primary,
+                          color: AppColors.primary, // Solid green inner button
                         ),
                         child: const Icon(
                           Icons.camera_alt,
                           color: Colors.white,
-                          size: 26,
+                          size: 28,
                         ),
                       ),
                     ),
@@ -1165,6 +1302,7 @@ class _AIGuidePageState extends State<AIGuidePage>
             ),
         ],
       ),
+    ),
     );
   }
 
@@ -1419,144 +1557,120 @@ class _AIGuidePageState extends State<AIGuidePage>
           ),
         ),
         Container(
-          color: Colors.white,
-          padding: const EdgeInsets.symmetric(
-            horizontal: 16,
-          ), // TASK 3: Meta floating style
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(0, 6, 0, 0),
-                child: Row(
-                  children:
-                      [
-                            'Tempat terdekat',
-                            'Sejarah Medan',
-                            'Rekomendasi',
-                            'Hotel terbaik',
-                          ]
-                          .map(
-                            (chip) => Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: ActionChip(
-                                label: Text(
-                                  chip,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                                onPressed: () => _sendMessage(chip),
-                                backgroundColor: Colors.white,
-                                side: const BorderSide(
+          color: const Color(0xFFF8F9FA), // Latar belakang abu-abu sangat muda
+          child: SafeArea(
+            top: false,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 32), // Lebar penuh (margin 0 di samping), melayang 32px dari bawah
+              padding: const EdgeInsets.symmetric(horizontal: 4), // Padding kecil agar box tidak terlalu kaku
+              decoration: BoxDecoration(
+                color: Colors.white,
+                // Border radius hanya di atas atau sedikit di semua sudut agar tetap terlihat modern
+                borderRadius: BorderRadius.circular(16), 
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withAlpha(8),
+                    blurRadius: 10,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Chips di dalam box tapi dengan padding sangat kecil agar tidak boros tempat
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                    child: Row(
+                      children: [
+                        'Tempat terdekat',
+                        'Sejarah Medan',
+                        'Rekomendasi',
+                        'Hotel terbaik',
+                      ].map((chip) => Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ActionChip(
+                              label: Text(
+                                chip,
+                                style: const TextStyle(
+                                  fontSize: 10, // Ukuran teks chip lebih kecil agar efisien
                                   color: AppColors.primary,
                                 ),
-                                visualDensity: VisualDensity.compact,
                               ),
+                              onPressed: () => _sendMessage(chip),
+                              backgroundColor: Colors.white,
+                              side: const BorderSide(color: AppColors.primary, width: 0.5),
+                              visualDensity: VisualDensity.compact,
                             ),
-                          )
+                          ))
                           .toList(),
-                ),
-              ),
-              Padding(
-                // Dynamic padding: Ensures comfortable distance from system nav bar or keyboard
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).viewInsets.bottom > 0
-                      ? 20 // Gap ketika keyboard terbuka
-                      : MediaQuery.of(context).padding.bottom +
-                            36, // Ditambah sedikit lagi agar tidak menabrak bar navigasi HP
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(0, 6, 0, 12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _textController,
-                          minLines: 1,
-                          maxLines: 4,
-                          textInputAction: TextInputAction.send,
-                          onSubmitted: (val) => _sendMessage(val),
-                          decoration: InputDecoration(
-                            hintText: _isListening
-                                ? 'Mendengarkan...'
-                                : 'Tanyakan sesuatu...',
-                            hintStyle: TextStyle(
-                              color: _isListening
-                                  ? Colors.redAccent
-                                  : Colors.grey[400],
-                            ),
-                            prefixIcon: IconButton(
-                              icon: const Icon(
-                                Icons.insert_emoticon_outlined,
-                                size: 22,
-                                color: Colors.grey,
-                              ),
-                              onPressed: _showEmojiPicker,
-                            ),
-                            suffixIcon: _speechEnabled
-                                ? IconButton(
-                                    icon: Icon(
-                                      _isListening
-                                          ? Icons.stop_circle_rounded
-                                          : Icons.mic_none_rounded,
-                                      color: _isListening
-                                          ? Colors.redAccent
-                                          : Colors.grey[600],
-                                      size: 28, // Ukuran diperbesar
-                                    ),
-                                    onPressed: _isListening
-                                        ? _stopListening
-                                        : _startListening,
-                                  )
-                                : null,
-                            filled: true,
-                            fillColor: const Color(0xFFF5F5F5),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(28),
-                              borderSide: BorderSide.none,
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            isDense: true,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Modern Send Circle Button
-                      GestureDetector(
-                        onTap: () => _sendMessage(_textController.text),
-                        child: Container(
-                          width: 48,
-                          height: 48,
-                          decoration: const BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black12,
-                                blurRadius: 4,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.send_rounded,
-                            color: Colors.white,
-                            size: 22,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
+                  // Input Bar
+                  Padding(
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.of(context).viewInsets.bottom > 0 ? 4 : 4,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _textController,
+                              minLines: 1,
+                              maxLines: 3,
+                              textInputAction: TextInputAction.send,
+                              onSubmitted: (val) => _sendMessage(val),
+                              decoration: InputDecoration(
+                                hintText: _isListening ? 'Mendengarkan...' : 'Tanyakan sesuatu...',
+                                hintStyle: const TextStyle(color: Colors.grey, fontSize: 13),
+                                prefixIcon: IconButton(
+                                  icon: const Icon(Icons.insert_emoticon_outlined, size: 20, color: Colors.grey),
+                                  onPressed: _showEmojiPicker,
+                                ),
+                                suffixIcon: _speechEnabled
+                                    ? IconButton(
+                                        icon: Icon(
+                                          _isListening ? Icons.stop_circle_rounded : Icons.mic_none_rounded,
+                                          color: _isListening ? Colors.redAccent : Colors.grey[600],
+                                          size: 22,
+                                        ),
+                                        onPressed: _isListening ? _stopListening : _startListening,
+                                      )
+                                    : null,
+                                filled: true,
+                                fillColor: const Color(0xFFF5F5F5),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                  borderSide: BorderSide.none,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                isDense: true,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: () => _sendMessage(_textController.text),
+                            child: Container(
+                              width: 42,
+                              height: 42,
+                              decoration: const BoxDecoration(
+                                color: AppColors.primary,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ],

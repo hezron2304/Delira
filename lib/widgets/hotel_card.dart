@@ -34,7 +34,7 @@ class HotelCard extends StatefulWidget {
 }
 
 class _HotelCardState extends State<HotelCard> {
-  bool _isButtonActive = false;
+  final bool _isButtonActive = false;
 
   @override
   Widget build(BuildContext context) {

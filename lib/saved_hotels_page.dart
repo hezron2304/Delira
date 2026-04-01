@@ -117,7 +117,7 @@ class _SavedHotelsPageState extends State<SavedHotelsPage> {
                           (hotel['harga_termurah'] as num?)?.toInt() ?? 0;
 
                       return HotelCard(
-                        name: hotel['nama'] ?? hotel['name'] ?? 'Hotel',
+                        name: hotel['nama'] ?? 'Hotel',
                         rating: (hotel['rating'] as num?)?.toDouble() ?? 0.0,
                         distance: LocationUtils.getDisplayDistance(hotel, _currentPosition),
                         price: rawPrice > 0

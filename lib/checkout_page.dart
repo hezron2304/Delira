@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:delira/theme/app_colors.dart';
@@ -50,8 +51,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
   String _selectedPayment = 'transfer_bank';
   bool _saveGuestData = false;
   bool _isLoading = false;
+  bool _isLoadingPromo = false;
   int _promoDiscount = 0;
   String _appliedPromo = '';
+  String? _appliedPromoExpiry;
+  String _discountType = 'fixed'; // 'fixed' or 'percentage'
+  double _discountValue = 0;
 
   @override
   void initState() {
@@ -248,24 +253,101 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  void _applyPromo() {
+  Future<void> _applyPromo() async {
     FocusScope.of(context).unfocus();
     final code = _promoController.text.trim().toUpperCase();
     if (code.isEmpty) return;
 
-    if (code == 'MEDAN10') {
+    setState(() {
+      _isLoadingPromo = true;
+      _appliedPromo = '';
+      _appliedPromoExpiry = null;
+      _promoDiscount = 0;
+      _discountValue = 0;
+    });
+
+    try {
+      final subtotal = widget.roomPrice * widget.nights * widget.rooms;
+
+      final data = await Supabase.instance.client
+          .from('promo_codes')
+          .select()
+          .eq('code', code)
+          .eq('is_active', true)
+          .maybeSingle();
+
+      debugPrint('DEBUG: Promo query response: $data');
+
+      if (data == null) {
+        throw 'Kode promo tidak valid atau tidak aktif';
+      }
+
+      // 1. Check expiry
+      if (data['expiry_date'] != null) {
+        final expiry = DateTime.parse(data['expiry_date']);
+        if (expiry.isBefore(DateTime.now())) {
+          throw 'Kode promo sudah kadaluarsa';
+        }
+      }
+
+      // 2. Check min purchase
+      final minPurchase = (data['min_purchase'] ?? 0).toDouble();
+      if (subtotal < minPurchase) {
+        throw 'Minimal pembelian untuk kode ini adalah Rp ${_formatRupiah(minPurchase.toInt())}';
+      }
+
+      // 3. Apply discount
+      final type = data['discount_type'] as String;
+      final val = (data['discount_value'] as num).toDouble();
+
       setState(() {
-        _promoDiscount = 50000;
-        _appliedPromo = 'MEDAN10';
+        _appliedPromo = code;
+        _discountType = type;
+        _discountValue = val;
+        _appliedPromoExpiry = data['expiry_date'];
+        
+        if (type == 'percentage') {
+          _promoDiscount = (subtotal * (val / 100)).round();
+        } else {
+          _promoDiscount = val.round();
+        }
+        
         _promoController.clear();
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Kode promo berhasil digunakan!')),
-      );
-    } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Kode promo tidak valid')));
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Kode promo berhasil digunakan!'),
+          ),
+        );
+      }
+    } catch (e) {
+      String errorMessage = 'Terjadi kesalahan sistem';
+
+      if (e is PostgrestException) {
+        // Menangani error spesifik dari Supabase (misal: tabel belum dibuat)
+        if (e.code == '42P01') {
+          errorMessage =
+              'Sistem promo sedang dalam pemeliharaan (Table not found)';
+        } else if (e.code == '42501') {
+          errorMessage = 'Izin akses promo ditolak (Permission denied)';
+        } else {
+          errorMessage = 'Database Error: ${e.message}';
+        }
+      } else {
+        errorMessage = e.toString().replaceAll('Exception:', '').trim();
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoadingPromo = false);
     }
   }
 
@@ -274,11 +356,27 @@ class _CheckoutPageState extends State<CheckoutPage> {
     final subtotal = widget.roomPrice * widget.nights * widget.rooms;
     final tax = (subtotal * 0.11).round();
     const serviceFee = 50000;
-    final totalAmount = subtotal + tax + serviceFee - _promoDiscount;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
+    // Recalculate discount if it's percentage (in case nights/rooms changed, although unlikely here)
+    int currentDiscount = _promoDiscount;
+    if (_appliedPromo.isNotEmpty && _discountType == 'percentage') {
+      currentDiscount = (subtotal * (_discountValue / 100)).round();
+    }
+
+    final totalAmount = subtotal + tax + serviceFee - currentDiscount;
+    final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        resizeToAvoidBottomInset: true,
+        appBar: AppBar(
         title: Text(
           'Checkout',
           style: GoogleFonts.inter(
@@ -294,7 +392,8 @@ class _CheckoutPageState extends State<CheckoutPage> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SingleChildScrollView(
+      body: SafeArea(
+        child: SingleChildScrollView(
         padding: const EdgeInsets.only(
           left: 20,
           right: 20,
@@ -314,13 +413,14 @@ class _CheckoutPageState extends State<CheckoutPage> {
             const SizedBox(height: 24),
             _buildSection5(),
             const SizedBox(height: 24),
-            _buildSection6(subtotal, tax, serviceFee, totalAmount),
-          ],
+                _buildSection6(subtotal, tax, serviceFee, currentDiscount, totalAmount),
+              ],
+            ),
+          ),
         ),
-      ),
-      bottomSheet: Container(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 50),
-        decoration: BoxDecoration(
+        bottomSheet: isKeyboardOpen ? null : Container(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 50),
+          decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
@@ -392,8 +492,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildSection1() {
     return Container(
@@ -587,46 +688,76 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     ),
                     elevation: 0,
                   ),
-                  child: Text(
-                    'Pakai',
-                    style: GoogleFonts.inter(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: _isLoadingPromo
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Text(
+                          'Pakai',
+                          style: GoogleFonts.inter(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
             ],
           ),
           if (_appliedPromo.isNotEmpty) ...[
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '$_appliedPromo - Diskon Rp ${_formatRupiah(_promoDiscount)}',
-                  style: GoogleFonts.inter(
-                    color: Colors.green,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _discountType == 'percentage'
+                            ? '$_appliedPromo - Diskon ${_discountValue.toInt()}% (Rp ${_formatRupiah(_promoDiscount)})'
+                            : '$_appliedPromo - Diskon Rp ${_formatRupiah(_promoDiscount)}',
+                        style: GoogleFonts.inter(
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _appliedPromo = '';
+                          _appliedPromoExpiry = null;
+                          _promoDiscount = 0;
+                        });
+                      },
+                      child: Text(
+                        'Hapus',
+                        style: GoogleFonts.inter(
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _appliedPromo = '';
-                      _promoDiscount = 0;
-                    });
-                  },
-                  child: Text(
-                    'Hapus',
-                    style: GoogleFonts.inter(
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
+                if (_appliedPromoExpiry != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4.0),
+                    child: Text(
+                      'Berlaku hingga: ${_formatDateWithDay(DateTime.parse(_appliedPromoExpiry!))}',
+                      style: GoogleFonts.inter(
+                        color: Colors.grey.shade600,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ],
@@ -693,7 +824,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12),
                 activeColor: AppColors.primary,
                 value: opt['val'] as String,
+                // ignore: deprecated_member_use
                 groupValue: _selectedPayment,
+                // ignore: deprecated_member_use
                 onChanged: (val) => setState(() => _selectedPayment = val!),
                 title: Text(
                   opt['title'] as String,
@@ -719,7 +852,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
   }
 
-  Widget _buildSection6(int subtotal, int tax, int serviceFee, int total) {
+  Widget _buildSection6(int subtotal, int tax, int serviceFee, int discount, int total) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -743,7 +876,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
           _buildInfoRow('Pajak (11%)', 'Rp ${_formatRupiah(tax)}'),
           const SizedBox(height: 8),
           _buildInfoRow('Biaya layanan', 'Rp ${_formatRupiah(serviceFee)}'),
-          if (_promoDiscount > 0) ...[
+          if (discount > 0) ...[
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -757,7 +890,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                   ),
                 ),
                 Text(
-                  '- Rp ${_formatRupiah(_promoDiscount)}',
+                  '- Rp ${_formatRupiah(discount)}',
                   style: GoogleFonts.inter(
                     color: Colors.green,
                     fontWeight: FontWeight.bold,

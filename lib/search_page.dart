@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:delira/utils/location_utils.dart';
 import 'package:delira/theme/app_colors.dart';
 import 'package:delira/models/destinasi.dart';
@@ -278,12 +279,21 @@ class _SearchPageState extends State<SearchPage> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: item.fullImageUrl.isNotEmpty
-                            ? Image.network(
-                                item.fullImageUrl,
+                            ? CachedNetworkImage(
+                                imageUrl: item.fullImageUrl,
                                 width: 72,
                                 height: 72,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) =>
+                                placeholder: (context, url) => Shimmer.fromColors(
+                                  baseColor: Colors.grey.shade200,
+                                  highlightColor: Colors.grey.shade100,
+                                  child: Container(
+                                    width: 72,
+                                    height: 72,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                errorWidget: (_, _, _) =>
                                     _buildFallbackIcon(item.iconData),
                               )
                             : _buildFallbackIcon(item.iconData),

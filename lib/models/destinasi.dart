@@ -16,6 +16,7 @@ class Destinasi {
   final List<String> gallery;
   final bool isActive;
   final bool isFeatured;
+  final String? tahun;
 
   Destinasi({
     this.id,
@@ -32,6 +33,7 @@ class Destinasi {
     this.gallery = const [],
     this.isActive = true,
     this.isFeatured = false,
+    this.tahun,
   });
 
   factory Destinasi.fromMap(Map<String, dynamic> map) {
@@ -52,6 +54,7 @@ class Destinasi {
           : [],
       isActive: map['is_active'] ?? true,
       isFeatured: map['is_featured'] ?? false,
+      tahun: map['tahun']?.toString(),
     );
   }
 
@@ -71,6 +74,7 @@ class Destinasi {
       'gallery': gallery,
       'is_active': isActive,
       'is_featured': isFeatured,
+      'tahun': tahun,
     };
   }
 
