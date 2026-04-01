@@ -12,6 +12,7 @@ import 'package:delira/theme/app_colors.dart';
 import 'package:delira/models/destinasi.dart';
 import 'package:delira/search_page.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:delira/notifikasi_page.dart';
 
 class HomePage extends StatefulWidget {
@@ -32,13 +33,118 @@ class _HomePageState extends State<HomePage> {
   String _userInitials = 'P';
   String? _avatarUrl;
   Position? _currentPosition;
+  int _unreadCount = 0;
 
   @override
   void initState() {
     super.initState();
     _fetchUserData();
     _fetchDestinasi();
-    _fetchLocation();
+    _fetchLocation().then((_) => _checkAutoArrival());
+    _fetchUnreadCount();
+  }
+
+  Future<void> _checkAutoArrival() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null || _currentPosition == null) return;
+
+      // 1. Ambil semua destinasi & hotel (untuk pemindaian)
+      // _destinasiList sudah diisi oleh _fetchDestinasi
+      
+      // Ambil hotel juga (karena di HomePage belum tentu semua hotel di-load)
+      final hotelRes = await Supabase.instance.client.from('hotel').select('id, nama, latitude, longitude');
+      final List hotels = hotelRes as List;
+
+      final now = DateTime.now();
+      final threshold = now.subtract(const Duration(hours: 24)).toIso8601String();
+
+      // --- CEK DESTINASI ---
+      for (var dest in _destinasiList) {
+        final double dist = Geolocator.distanceBetween(
+          _currentPosition!.latitude,
+          _currentPosition!.longitude,
+          dest.latitude,
+          dest.longitude,
+        );
+
+        if (dist <= 500) {
+          // Cek apakah sudah check-in di tempat ini dalam 24 jam terakhir
+          final existing = await Supabase.instance.client
+              .from('riwayat_kunjungan')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('destinasi_id', dest.id!)
+              .gt('waktu_kunjungan', threshold)
+              .maybeSingle();
+
+          if (existing == null) {
+            // Auto Check-in!
+            await Supabase.instance.client.from('riwayat_kunjungan').insert({
+              'user_id': user.id,
+              'destinasi_id': dest.id!,
+              'waktu_kunjungan': now.toIso8601String(),
+            });
+            
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Anda terdeteksi di ${dest.nama}! Kunjungan otomatis dicatat. 📍'),
+                  backgroundColor: AppColors.primary,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+            return; // Berhenti setelah menemukan satu (opsional, agar tidak spam banyak tempat sekaligus)
+          }
+        }
+      }
+
+      // --- CEK HOTEL ---
+      for (var h in hotels) {
+        final double hLat = (h['latitude'] is String) ? double.tryParse(h['latitude']) ?? 0 : (h['latitude'] as num?)?.toDouble() ?? 0;
+        final double hLng = (h['longitude'] is String) ? double.tryParse(h['longitude']) ?? 0 : (h['longitude'] as num?)?.toDouble() ?? 0;
+        
+        final double dist = Geolocator.distanceBetween(
+          _currentPosition!.latitude,
+          _currentPosition!.longitude,
+          hLat,
+          hLng,
+        );
+
+        if (dist <= 500) {
+          final existing = await Supabase.instance.client
+              .from('riwayat_kunjungan')
+              .select('id')
+              .eq('user_id', user.id)
+              .eq('hotel_id', h['id'])
+              .gt('waktu_kunjungan', threshold)
+              .maybeSingle();
+
+          if (existing == null) {
+            await Supabase.instance.client.from('riwayat_kunjungan').insert({
+              'user_id': user.id,
+              'hotel_id': h['id'],
+              'waktu_kunjungan': now.toIso8601String(),
+            });
+
+            if (mounted) {
+              final String name = h['nama'] ?? 'Hotel';
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Anda terdeteksi di $name! Kunjungan otomatis dicatat. 🏨'),
+                  backgroundColor: AppColors.primary,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('AUTO_CHECKIN_ERROR: $e');
+    }
   }
 
   Future<void> _fetchLocation() async {
@@ -76,6 +182,43 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (_) {
       // safe fallback
+    }
+  }
+
+  Future<void> _fetchUnreadCount() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user == null) return;
+
+      // 1. Ambil semua ID notifikasi yang relevan (global + personal)
+      final allNotifsRes = await Supabase.instance.client
+          .from('notifikasi')
+          .select('id')
+          .or('user_id.is.null,user_id.eq.${user.id}');
+      
+      final List allNotifIds = (allNotifsRes as List).map((n) => n['id'].toString()).toList();
+
+      // 2. Ambil ID yang sudah dibaca oleh user ini
+      final readRes = await Supabase.instance.client
+          .from('notifikasi_dibaca')
+          .select('notifikasi_id')
+          .eq('user_id', user.id);
+      
+      final List readIds = (readRes as List).map((n) => n['notifikasi_id'].toString()).toList();
+
+      // 3. Hitung yang belum ada di daftar baca
+      int unread = 0;
+      for (var id in allNotifIds) {
+        if (!readIds.contains(id)) unread++;
+      }
+
+      if (mounted) {
+        setState(() {
+          _unreadCount = unread;
+        });
+      }
+    } catch (e) {
+      debugPrint('FETCH_UNREAD_COUNT_ERROR: $e');
     }
   }
 
@@ -139,25 +282,27 @@ class _HomePageState extends State<HomePage> {
                                 _currentIndex = 2;
                               });
                             })
-                          : SingleChildScrollView(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  _buildHeader(context),
-                                  const SizedBox(height: 24),
-                                  _buildCategoryChips(),
-                                  const SizedBox(height: 24),
-                                  _buildSectionTitle('Destinasi Unggulan'),
-                                  const SizedBox(height: 16),
-                                  _isLoading ? _buildShimmerHorizontal() : _buildDestinasiUnggulanList(),
-                                  const SizedBox(height: 24),
-                                  _buildSectionTitle('Terdekat dari Kamu'),
-                                  const SizedBox(height: 16),
-                                  _isLoading ? _buildShimmerVertical() : _buildTerdekatList(),
-                                  const SizedBox(height: 24),
-                                ],
-                              ),
-                            ),
+                      : CustomScrollView(
+                          slivers: [
+                            SliverToBoxAdapter(child: _buildHeader(context)),
+                            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                            SliverToBoxAdapter(child: _buildCategoryChips()),
+                            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                            SliverToBoxAdapter(child: _buildSectionTitle('Destinasi Unggulan')),
+                            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                            SliverToBoxAdapter(
+                                child: _isLoading
+                                    ? _buildShimmerHorizontal()
+                                    : _buildDestinasiUnggulanList()),
+                            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                            SliverToBoxAdapter(child: _buildSectionTitle('Terdekat dari Kamu')),
+                            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                            _isLoading
+                                ? SliverToBoxAdapter(child: _buildShimmerVertical())
+                                : _buildTerdekatSliverList(),
+                            const SliverToBoxAdapter(child: SizedBox(height: 100)),
+                          ],
+                        ),
         ),
         bottomNavigationBar: _currentIndex == 4 ? const SizedBox.shrink() : _buildBottomNav(),
         floatingActionButton: _currentIndex == 4
@@ -251,11 +396,13 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
               GestureDetector(
-                onTap: () {
-                  Navigator.push(
+                onTap: () async {
+                  await Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => const NotifikasiPage()),
                   );
+                  // Refresh badge count when returning
+                  _fetchUnreadCount();
                 },
                 child: Container(
                   width: 40,
@@ -268,18 +415,19 @@ class _HomePageState extends State<HomePage> {
                     alignment: Alignment.center,
                     children: [
                       const Icon(Icons.notifications_outlined, color: Colors.white, size: 24),
-                      Positioned(
-                        right: 8,
-                        top: 8,
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Colors.redAccent,
-                            shape: BoxShape.circle,
+                      if (_unreadCount > 0)
+                        Positioned(
+                          right: 8,
+                          top: 8,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Colors.redAccent,
+                              shape: BoxShape.circle,
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),
@@ -480,7 +628,10 @@ class _HomePageState extends State<HomePage> {
                     color: AppColors.surface,
                     borderRadius: BorderRadius.circular(16),
                     image: imageUrl.isNotEmpty 
-                        ? DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover) 
+                        ? DecorationImage(
+                            image: CachedNetworkImageProvider(imageUrl), 
+                            fit: BoxFit.cover
+                          ) 
                         : null,
                   ),
                 ),
@@ -577,143 +728,164 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildTerdekatList() {
+  Widget _buildTerdekatSliverList() {
     final items = List<Destinasi>.from(_filteredDestinasi);
 
     if (_currentPosition != null) {
       try {
         items.sort((a, b) {
           final distA = Geolocator.distanceBetween(
-            _currentPosition!.latitude, 
-            _currentPosition!.longitude, 
-            a.latitude, 
-            a.longitude
-          );
+              _currentPosition!.latitude,
+              _currentPosition!.longitude,
+              a.latitude,
+              a.longitude);
           final distB = Geolocator.distanceBetween(
-            _currentPosition!.latitude, 
-            _currentPosition!.longitude, 
-            b.latitude, 
-            b.longitude
-          );
+              _currentPosition!.latitude,
+              _currentPosition!.longitude,
+              b.latitude,
+              b.longitude);
           return distA.compareTo(distB);
         });
       } catch (e) {
         debugPrint('Error sorting Destinasi by distance: $e');
       }
     }
-    
+
     if (items.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-        child: Text('Tidak ada destinasi.', textAlign: TextAlign.center, style: TextStyle(color: Colors.black54)),
+      return const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+          child: Text('Tidak ada destinasi.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.black54)),
+        ),
       );
     }
 
-    return Padding(
+    return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 24.0),
-      child: Column(
-        children: items.map((item) {
-          final String name = item.nama;
-          final String kategori = item.kategori;
-          final double rating = item.rating;
-          final String dist = LocationUtils.getDisplayDistance(item.toMap(), _currentPosition);
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            final item = items[index];
+            final String name = item.nama;
+            final String kategori = item.kategori;
+            final double rating = item.rating;
+            final String dist = LocationUtils.getDisplayDistance(
+                item.toMap(), _currentPosition);
 
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Material(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(16),
-              child: InkWell(
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Material(
+                color: AppColors.surface,
                 borderRadius: BorderRadius.circular(16),
-                onTap: () async {
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => DetailPage(destinasi: item)),
-                  );
-                  if (result == 'GO_TO_HOTEL' && mounted) {
-                    setState(() {
-                      _currentIndex = 2; // Index for Hotel tab
-                    });
-                  }
-                },
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Center(
-                          child: Icon(
-                            item.iconData,
-                            color: AppColors.primaryDark,
-                            size: 36,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () async {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => DetailPage(destinasi: item)),
+                    );
+                    if (result == 'GO_TO_HOTEL' && mounted) {
+                      setState(() {
+                        _currentIndex = 2; // Index for Hotel tab
+                      });
+                    }
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Center(
+                            child: Icon(
+                              item.iconData,
+                              color: AppColors.primaryDark,
+                              size: 36,
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    name,
-                                    style: const TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      height: 1.3,
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      name,
+                                      style: const TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        height: 1.3,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                Row(
-                                  children: [
-                                    Text(
-                                      dist,
-                                      style: const TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.bold),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    const Icon(Icons.chevron_right, color: Colors.grey, size: 18),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                Text(
-                                  kategori,
-                                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                                ),
-                                const SizedBox(width: 8),
-                                const Text('•', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                                const SizedBox(width: 8),
-                                const Icon(Icons.star, color: Colors.amber, size: 14),
-                                const SizedBox(width: 4),
-                                Text(rating.toString(), style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                              ],
-                            ),
-                          ],
+                                  const SizedBox(width: 8),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        dist,
+                                        style: const TextStyle(
+                                            color: AppColors.primary,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.chevron_right,
+                                          color: Colors.grey, size: 18),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Text(
+                                    kategori,
+                                    style: const TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 12),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text('•',
+                                      style: TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 12)),
+                                  const SizedBox(width: 8),
+                                  const Icon(Icons.star,
+                                      color: Colors.amber, size: 14),
+                                  const SizedBox(width: 4),
+                                  Text(rating.toString(),
+                                      style: const TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 12)),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          );
-        }).toList(),
+            );
+          },
+          childCount: items.length,
+        ),
       ),
     );
   }

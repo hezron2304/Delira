@@ -237,113 +237,118 @@ class _HotelPageState extends State<HotelPage> {
       body: GestureDetector(
         onTap: _onTapOutside, // Tap outside cards resets selection
         behavior: HitTestBehavior.translucent,
-        child: SingleChildScrollView(
+        child: CustomScrollView(
           controller: _scrollController,
-          padding: EdgeInsets.fromLTRB(24.0, MediaQuery.of(context).padding.top + 24.0, 24.0, 24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'Hotel & Penginapan',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Sekitar Medan Kota',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 24),
-              
-              // Search Bar
-              Container(
-                height: 50,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(40),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
+          slivers: [
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(24.0, MediaQuery.of(context).padding.top + 24.0, 24.0, 0),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  const Text(
+                    'Hotel & Penginapan',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
                     ),
-                  ],
-                ),
-                child: TextField(
-                  readOnly: true,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const SearchPage()),
-                    );
-                  },
-                  style: const TextStyle(fontSize: 15, color: AppColors.textPrimary),
-                  decoration: const InputDecoration(
-                    hintText: 'Cari hotel...',
-                    hintStyle: TextStyle(color: AppColors.textTertiary, fontSize: 14),
-                    prefixIcon: Icon(Icons.search, color: AppColors.primary, size: 22),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.only(top: 14, bottom: 14, right: 16),
                   ),
-                ),
-              ),
-              const SizedBox(height: 24),
-  
-              // Chips
-              SizedBox(
-                height: 40,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _categories.length,
-                  separatorBuilder: (context, index) => const SizedBox(width: 12),
-                  itemBuilder: (context, index) {
-                    final category = _categories[index];
-                    final isActive = category == _activeCategory;
-                    return GestureDetector(
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Sekitar Medan Kota',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Search Bar
+                  Container(
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(40),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: TextField(
+                      readOnly: true,
                       onTap: () {
-                        if (_activeCategory != category) {
-                          setState(() {
-                            _activeCategory = category;
-                          });
-                          _fetchHotels();
-                        }
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const SearchPage()),
+                        );
                       },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: isActive ? AppColors.primary : Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: isActive ? Colors.transparent : AppColors.border,
-                          ),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          category,
-                          style: TextStyle(
-                            color: isActive ? Colors.white : AppColors.textPrimary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
+                      style: const TextStyle(fontSize: 15, color: AppColors.textPrimary),
+                      decoration: const InputDecoration(
+                        hintText: 'Cari hotel...',
+                        hintStyle: TextStyle(color: AppColors.textTertiary, fontSize: 14),
+                        prefixIcon: Icon(Icons.search, color: AppColors.primary, size: 22),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.only(top: 14, bottom: 14, right: 16),
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+      
+                  // Chips
+                  SizedBox(
+                    height: 40,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _categories.length,
+                      separatorBuilder: (context, index) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) {
+                        final category = _categories[index];
+                        final isActive = category == _activeCategory;
+                        return GestureDetector(
+                          onTap: () {
+                            if (_activeCategory != category) {
+                              setState(() {
+                                _activeCategory = category;
+                              });
+                              _fetchHotels();
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isActive ? AppColors.primary : Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: isActive ? Colors.transparent : AppColors.border,
+                              ),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              category,
+                              style: TextStyle(
+                                color: isActive ? Colors.white : AppColors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ]),
               ),
-              const SizedBox(height: 24),
-  
-              // Grid
-              if (_isLoading)
-                _buildSkeletonLoader()
-              else if (_errorMessage != null)
-                Center(
+            ),
+            
+            // Grid or State widgets
+            if (_isLoading)
+              SliverToBoxAdapter(child: _buildSkeletonLoader())
+            else if (_errorMessage != null)
+              SliverToBoxAdapter(
+                child: Center(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
@@ -363,9 +368,11 @@ class _HotelPageState extends State<HotelPage> {
                       ],
                     ),
                   ),
-                )
-              else if (_hotels.isEmpty)
-                Center(
+                ),
+              )
+            else if (_hotels.isEmpty)
+              SliverToBoxAdapter(
+                child: Center(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
                     child: Column(
@@ -390,62 +397,63 @@ class _HotelPageState extends State<HotelPage> {
                       ],
                     ),
                   ),
-                )
-              else
-                GridView.builder(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: 0.48, // Reduced to make cards taller and fix overflow
                 ),
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _hotels.length,
-                itemBuilder: (context, index) {
-                  final hotel = _hotels[index];
-                  final isSelected = _selectedCardIndex == index;
-                  
-                  final rawPrice = (hotel['harga_termurah'] as num?)?.toInt() ?? 0;
-                  
-                  // Calculate display distance for subtitle
-                  String? destDistance;
-                  if (widget.destLat != null && widget.destLng != null && hotel['dist_from_dest'] != null) {
-                    final double d = hotel['dist_from_dest'] as double;
-                    if (d < 1000) {
-                      destDistance = '${d.toStringAsFixed(0)} m';
-                    } else {
-                      destDistance = '${(d / 1000).toStringAsFixed(1)} km';
-                    }
-                  }
-  
-                  return HotelCard(
-                    name: hotel['nama'] ?? hotel['name'] ?? 'Hotel',
-                    rating: (hotel['rating'] as num?)?.toDouble() ?? 0.0,
-                    distance: LocationUtils.getDisplayDistance(hotel, _currentPosition),
-                    price: rawPrice > 0 ? 'Rp ${_formatRupiah(rawPrice)}' : 'Hubungi Kami',
-                    imageUrl: hotel['foto_utama_url'] ?? hotel['image_url'] ?? hotel['image'] ?? '',
-                    isSelected: isSelected,
-                    hotelData: hotel,
-                    destName: widget.destName,
-                    destDistance: destDistance,
-                    onTap: () => _onCardTap(index),
-                  );
-                },
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                sliver: SliverGrid(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    childAspectRatio: 0.48,
+                  ),
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final hotel = _hotels[index];
+                      final isSelected = _selectedCardIndex == index;
+                      final rawPrice = (hotel['harga_termurah'] as num?)?.toInt() ?? 0;
+                      
+                      String? destDistance;
+                      if (widget.destLat != null && widget.destLng != null && hotel['dist_from_dest'] != null) {
+                        final double d = hotel['dist_from_dest'] as double;
+                        destDistance = d < 1000 ? '${d.toStringAsFixed(0)} m' : '${(d / 1000).toStringAsFixed(1)} km';
+                      }
+      
+                      return HotelCard(
+                        name: hotel['nama'] ?? 'Hotel',
+                        rating: (hotel['rating'] as num?)?.toDouble() ?? 0.0,
+                        distance: LocationUtils.getDisplayDistance(hotel, _currentPosition),
+                        price: rawPrice > 0 ? 'Rp ${_formatRupiah(rawPrice)}' : 'Hubungi Kami',
+                        imageUrl: hotel['foto_utama_url'] ?? '',
+                        isSelected: isSelected,
+                        hotelData: hotel,
+                        destName: widget.destName,
+                        destDistance: destDistance,
+                        onTap: () => _onCardTap(index),
+                      );
+                    },
+                    childCount: _hotels.length,
+                  ),
+                ),
               ),
+
               if (_isLoadingMore)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 32),
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      strokeWidth: 3,
-                      color: AppColors.primary,
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 32),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        color: AppColors.primary,
+                      ),
                     ),
                   ),
                 ),
-              SizedBox(height: MediaQuery.of(context).padding.bottom + 100),
-            ],
-          ),
+
+              SliverToBoxAdapter(child: SizedBox(height: MediaQuery.of(context).padding.bottom + 100)),
+          ],
         ),
       ),
     ),

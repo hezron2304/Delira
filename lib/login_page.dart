@@ -176,7 +176,7 @@ class _LoginPageState extends State<LoginPage> {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: Image.asset(
-                      'assets/images/delira_logo2.png',
+                      'assets/images/delira_logo.png',
                       height: 32,
                       width: 32,
                       fit: BoxFit.cover,
@@ -290,7 +290,7 @@ class _LoginPageState extends State<LoginPage> {
                 alignment: Alignment.centerRight,
                 child: GestureDetector(
                   onTap: () {
-                    // TODO: Implement forgot password
+                    debugPrint('Forgot password clicked');
                   },
                   child: const Text(
                     'Lupa kata sandi?',

@@ -75,6 +75,19 @@ class _ProfilPageState extends State<ProfilPage> {
       }
     } catch (e) {
       debugPrint('Error fetching scan count: $e');
+      if (mounted) {
+        String errorMsg = 'Gagal memuat statistik scan';
+        if (e.toString().contains('permission denied')) {
+          errorMsg = 'Akses tabel riwayat_scan ditolak (Cek Grant SQL)';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMsg),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 
@@ -293,7 +306,7 @@ class _ProfilPageState extends State<ProfilPage> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(20),
                         child: Image.asset(
-                          'assets/images/delira_logo2.png',
+                          'assets/images/delira_logo.png',
                           fit: BoxFit.cover,
                         ),
                       ),

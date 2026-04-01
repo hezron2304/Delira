@@ -34,7 +34,7 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 800),
     );
 
-    _logoScale = Tween<double>(begin: 0.6, end: 1.0).animate(
+    _logoScale = Tween<double>(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(parent: _logoController, curve: Curves.easeOutBack),
     );
 
@@ -160,7 +160,7 @@ class _SplashPageState extends State<SplashPage> with TickerProviderStateMixin {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(28),
                     child: Image.asset(
-                      'assets/images/delira_logo2.png',
+                      'assets/images/delira_logo.png',
                       fit: BoxFit.cover,
                     ),
                   ),
