@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class DetectedObject {
@@ -824,28 +825,36 @@ class _AIGuidePageState extends State<AIGuidePage>
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (bool didPop, dynamic result) {
-        if (didPop) return;
-        if (widget.onBackPressed != null) {
-          widget.onBackPressed!();
-        } else {
-          Navigator.of(context).pop();
-        }
-      },
-      child: Scaffold(
-        resizeToAvoidBottomInset: true,
-        backgroundColor: Colors.white,
-        body: SafeArea(
-          bottom: false, // Konsisten Edge-to-Edge: Konten mentok sampai bawah
-          child: Column(
-            children: [
-              _buildTabBar(),
-              Expanded(
-                child: _selectedTab == 0 ? _buildCameraTab() : _buildChatPage(),
-              ),
-            ],
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (bool didPop, dynamic result) {
+          if (didPop) return;
+          if (widget.onBackPressed != null) {
+            widget.onBackPressed!();
+          } else {
+            Navigator.of(context).pop();
+          }
+        },
+        child: Scaffold(
+          resizeToAvoidBottomInset: true,
+          backgroundColor: Colors.white,
+          body: SafeArea(
+            bottom: false, // Konsisten Edge-to-Edge: Konten mentok sampai bawah
+            child: Column(
+              children: [
+                _buildTabBar(),
+                Expanded(
+                  child: _selectedTab == 0 ? _buildCameraTab() : _buildChatPage(),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -855,18 +864,15 @@ class _AIGuidePageState extends State<AIGuidePage>
   // ── Tab Bar (2 tab) ───────────────────────────────────────────────────────────
 
   Widget _buildTabBar() {
-    return SafeArea(
-      top: true, // TASK 4: Protect tabs from status bar overlap
-      child: Container(
-        color: Colors.white,
-        child: Row(
-          children: [
-            Expanded(
-              child: _tabItem(Icons.camera_alt_outlined, 'Scan / AR', 0),
-            ),
-            Expanded(child: _tabItem(Icons.chat_bubble_outline, 'Chat AI', 1)),
-          ],
-        ),
+    return Container(
+      color: Colors.white,
+      child: Row(
+        children: [
+          Expanded(
+            child: _tabItem(Icons.camera_alt_outlined, 'Scan / AR', 0),
+          ),
+          Expanded(child: _tabItem(Icons.chat_bubble_outline, 'Chat AI', 1)),
+        ],
       ),
     );
   }
@@ -1153,7 +1159,7 @@ class _AIGuidePageState extends State<AIGuidePage>
       top: false,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-        margin: const EdgeInsets.fromLTRB(28, 0, 28, 60), // Even more "floating" gap
+        margin: const EdgeInsets.fromLTRB(28, 0, 28, 20), // Reduced "floating" gap from 60 to 20
         // REMOVED: BoxDecoration with background, radius and shadow to make it borderless/transparent as requested
       child: Column(
         mainAxisSize: MainAxisSize.min,

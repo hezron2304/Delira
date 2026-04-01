@@ -11,6 +11,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:delira/hotel_page.dart';
 import 'package:delira/map_page.dart';
+import 'package:delira/ai_guide_page.dart';
 
 class DetailPage extends StatefulWidget {
   final Destinasi destinasi;
@@ -1302,7 +1303,14 @@ class _DetailPageState extends State<DetailPage> {
                     child: SizedBox(
                       height: 52,
                       child: OutlinedButton.icon(
-                        onPressed: () {},
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const AIGuidePage(),
+                            ),
+                          );
+                        },
                         icon: const Icon(
                           Icons.smart_toy_outlined,
                           size: 16,
