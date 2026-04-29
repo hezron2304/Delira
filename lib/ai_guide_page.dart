@@ -6,8 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:delira/theme/app_colors.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:google_generative_ai/google_generative_ai.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:delira/env/env.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:flutter/services.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
@@ -68,11 +67,8 @@ class _AIGuidePageState extends State<AIGuidePage>
   String? _scanResult;
   String? _capturedImagePath;
 
-  // Chat AI
-  final String _geminiApiKey = dotenv.env['GEMINI_API_KEY'] ?? '';
-
-  late final GenerativeModel _visionModel;
-  late final GenerativeModel _chatModel;
+  // No longer using local API Key directly
+  // final String _geminiApiKey = Env.geminiApiKey;
 
   bool _isCooldown = false;
   Timer? _cooldownTimer;
@@ -141,15 +137,7 @@ class _AIGuidePageState extends State<AIGuidePage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    // Initialize Gemini Models
-    _visionModel = GenerativeModel(
-      model: 'gemini-2.5-flash',
-      apiKey: _geminiApiKey,
-    );
-    _chatModel = GenerativeModel(
-      model: 'gemini-2.5-flash',
-      apiKey: _geminiApiKey,
-    );
+    // Supabase Edge Functions is now handling Gemini completely
 
     _messages.add({
       'role': 'bot',
@@ -259,20 +247,17 @@ class _AIGuidePageState extends State<AIGuidePage>
         return;
       }
 
-      final content = [
-        Content.multi([
-          DataPart('image/jpeg', bytes),
-          TextPart(
-            'Identifikasi objek utama (bangunan, fasilitas, atau benda unik). '
-            'Respon HANYA format JSON list: [{"name": "..", "description": "..", "x": 1-100, "y": 1-100}]. '
-            'PENTING: Gunakan bahasa yang sesuai konteks (ID/EN). '
-            'Persona: Delira (santai & bersahabat). Tanpa emoji. Maks 2 objek.',
-          ),
-        ]),
-      ];
+      final base64Image = base64Encode(bytes);
 
-      final response = await _visionModel.generateContent(content);
-      final jsonText = response.text;
+      final response = await Supabase.instance.client.functions.invoke(
+        'gemini-ai',
+        body: {
+          'type': 'vision',
+          'text': 'Identifikasi objek utama (bangunan, fasilitas, atau benda unik). Respon HANYA format JSON list: [{"name": "..", "description": "..", "x": 1-100, "y": 1-100}]. PENTING: Gunakan bahasa yang sesuai konteks (ID/EN). Persona: Delira (santai & bersahabat). Tanpa emoji. Maks 2 objek.',
+          'imageBase64': base64Image,
+        },
+      );
+      final jsonText = response.data['text'];
 
       debugPrint('DEBUG: Terdeteksi: $jsonText');
       if (jsonText != null && jsonText.isNotEmpty && mounted) {
@@ -444,20 +429,17 @@ class _AIGuidePageState extends State<AIGuidePage>
     try {
       final bytes = await File(path).readAsBytes();
 
-      final content = [
-        Content.multi([
-          DataPart('image/jpeg', bytes),
-          TextPart(
-            'Identifikasi foto ini dengan santai dan bersahabat sebagai Delira. '
-            'Jika WISATA: Sebut Nama, Deskripsi menarik, Hotel Terdekat & Harga, Tips Navigasi. '
-            'Jika BUDAYA: Sebut Nama, Asal, Harga, Tempat Beli. '
-            'PENTING: Gunakan bahasa yang sesuai dengan konteks (ID/EN). Respon harus ramah tanpa emoji.',
-          ),
-        ]),
-      ];
+      final base64Image = base64Encode(bytes);
 
-      final response = await _visionModel.generateContent(content);
-      final result = response.text;
+      final response = await Supabase.instance.client.functions.invoke(
+        'gemini-ai',
+        body: {
+          'type': 'vision',
+          'text': 'Identifikasi foto ini dengan santai dan bersahabat sebagai Delira. Jika WISATA: Sebut Nama, Deskripsi menarik, Hotel Terdekat & Harga, Tips Navigasi. Jika BUDAYA: Sebut Nama, Asal, Harga, Tempat Beli. PENTING: Gunakan bahasa yang sesuai dengan konteks (ID/EN). Respon harus ramah tanpa emoji.',
+          'imageBase64': base64Image,
+        },
+      );
+      final result = response.data['text'];
 
       if (result != null && mounted) {
         setState(() {
@@ -610,13 +592,14 @@ class _AIGuidePageState extends State<AIGuidePage>
     }
 
     try {
-      final content = [
-        Content.text(
-          'Kamu adalah MedanBot asisten wisata Medan. Jawab secara informatif dalam Bahasa Indonesia. JANGAN gunakan emoji. Pertanyaan: $text',
-        ),
-      ];
-      final response = await _chatModel.generateContent(content);
-      final botReply = response.text;
+      final response = await Supabase.instance.client.functions.invoke(
+        'gemini-ai',
+        body: {
+          'type': 'chat',
+          'text': 'Kamu adalah MedanBot asisten wisata Medan. Jawab secara informatif dalam Bahasa Indonesia. JANGAN gunakan emoji. Pertanyaan: $text',
+        },
+      );
+      final botReply = response.data['text'];
 
       if (botReply != null && mounted) {
         setState(() {

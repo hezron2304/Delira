@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:delira/env/env.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:delira/theme/app_colors.dart';
@@ -15,12 +15,9 @@ Future<void> main() async {
   // Inisialisasi format tanggal (Indonesian locale)
   await initializeDateFormatting('id_ID', null);
 
-  // Inisialisasi Environment Variables (API Key)
-  await dotenv.load(fileName: ".env");
-
   await Supabase.initialize(
-    url: dotenv.env['SUPABASE_URL'] ?? '',
-    anonKey: dotenv.env['SUPABASE_ANON_KEY'] ?? '',
+    url: Env.supabaseUrl,
+    anonKey: Env.supabaseAnonKey,
   );
 
   // >>> GLOBAL SYSTEM UI / EDGE-TO-EDGE FIX <<<
